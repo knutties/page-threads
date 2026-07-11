@@ -7,8 +7,11 @@ export async function topicKey(entityUri: string): Promise<string> {
 }
 
 export function topicName(title: string, key: string): string {
-  const t = title.trim().slice(0, 40).trim() || 'Untitled'
-  return `${t} · ${key}`
+  let t = title.trim().slice(0, 40)
+  const last = t.charCodeAt(t.length - 1)
+  if (last >= 0xd800 && last <= 0xdbff) t = t.slice(0, -1) // drop dangling high surrogate
+  t = t.trim()
+  return `${t || 'Untitled'} · ${key}`
 }
 
 export function matchTopicByKey(topics: string[], key: string): string | null {

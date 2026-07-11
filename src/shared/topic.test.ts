@@ -33,6 +33,13 @@ describe('topicName', () => {
   test('falls back to Untitled for empty title', () => {
     expect(topicName('   ', 'k'.repeat(16))).toBe(`Untitled · ${'k'.repeat(16)}`)
   })
+
+  test('truncation never splits a surrogate pair', () => {
+    const title = 'a'.repeat(39) + '😀' + 'b'.repeat(10)
+    const name = topicName(title, 'k'.repeat(16))
+    expect(name).toBe(`${'a'.repeat(39)} · ${'k'.repeat(16)}`)
+    expect(name.includes('\uD83D')).toBe(false)
+  })
 })
 
 describe('matchTopicByKey', () => {
