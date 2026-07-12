@@ -49,11 +49,40 @@ export interface GetEventsResponse extends ZulipSuccess {
   events: ZulipEvent[]
 }
 
+export interface ServerSettings {
+  passwordAuthEnabled: boolean
+  realmName: string
+  zulipVersion: string
+}
+
+export interface GetOwnUserResponse {
+  result: 'success'
+  msg: string
+  email: string
+  delivery_email?: string
+  full_name: string
+}
+
 export class ZulipError extends Error {
   constructor(msg: string, readonly code?: string) {
     super(msg)
     this.name = 'ZulipError'
   }
+}
+
+async function unauthenticatedRequest(
+  realmUrl: string,
+  path: string,
+  init: RequestInit | undefined,
+  fetchFn: typeof fetch
+): Promise<any> {
+  const f = fetchFn.bind(globalThis)
+  const res = await f(new URL(`/api/v1${path}`, realmUrl).toString(), init)
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok || data.result !== 'success') {
+    throw new ZulipError(data.msg ?? `HTTP ${res.status}`, data.code)
+  }
+  return data
 }
 
 export class ZulipClient {
@@ -138,5 +167,32 @@ export class ZulipClient {
       last_event_id: lastEventId,
     })
     return data.events
+  }
+
+  /** Unauthenticated realm probe (GET /server_settings). */
+  static async probeServer(realmUrl: string, fetchFn: typeof fetch = fetch): Promise<ServerSettings> {
+    const data = await unauthenticatedRequest(realmUrl, '/server_settings', undefined, fetchFn)
+    return {
+      passwordAuthEnabled: Boolean(data.authentication_methods?.password),
+      realmName: data.realm_name ?? '',
+      zulipVersion: data.zulip_version ?? '',
+    }
+  }
+
+  /** Exchange email+password for an API key (POST /fetch_api_key). Password is not retained. */
+  static async fetchApiKey(
+    realmUrl: string,
+    email: string,
+    password: string,
+    fetchFn: typeof fetch = fetch
+  ): Promise<string> {
+    const body = new URLSearchParams({ username: email, password })
+    const data = await unauthenticatedRequest(realmUrl, '/fetch_api_key', { method: 'POST', body }, fetchFn)
+    return data.api_key
+  }
+
+  async getOwnUser(): Promise<{ email: string; fullName: string }> {
+    const data = await this.request<GetOwnUserResponse>('GET', '/users/me')
+    return { email: data.delivery_email ?? data.email, fullName: data.full_name }
   }
 }
