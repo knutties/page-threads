@@ -1,3 +1,4 @@
 import { render } from 'preact'
+import { App } from './App'
 
-render(<div>PageThreads</div>, document.getElementById('root')!)
+render(<App />, document.getElementById('root')!)
