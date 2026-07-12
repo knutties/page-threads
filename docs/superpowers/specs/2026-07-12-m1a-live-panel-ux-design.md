@@ -57,7 +57,7 @@ Rules: pinned → pushes ignored; unpinned push with same URI → ignore; differ
 
 ### Settings foundation (new, minimal)
 
-New `src/shared/settings.ts`: a typed read/write layer over `chrome.storage.local` with a defaults object and a `watch` helper (storage.onChanged). M1a defines `{ onNonWebPage: 'hold' | 'clear' }` (default `'hold'`). No settings UI in M1a — the toggle surfaces on M1d's options page; until then the stored value is respected and changeable via the service-worker console. This module is deliberately the same foundation M1b (credentials) and M1d (rules, defaults) will build on.
+New `src/shared/settings.ts`: a typed read/write layer over `chrome.storage.local` with a defaults object and a `watch` helper (storage.onChanged). **Requires adding `"storage"` to the manifest's `permissions`** (M0 shipped `["sidePanel"]` only; without it `chrome.storage` is undefined and the panel crashes blank at load — found in M1a manual acceptance). M1a defines `{ onNonWebPage: 'hold' | 'clear' }` (default `'hold'`). No settings UI in M1a — the toggle surfaces on M1d's options page; until then the stored value is respected and changeable via the service-worker console. This module is deliberately the same foundation M1b (credentials) and M1d (rules, defaults) will build on.
 
 Header gains a pin button (📌 toggling filled/outline, `title` text explains). Composer drafts: `Map<entityUri, string>` in panel memory; saved on thread switch, restored on arrival, entry cleared on successful send.
 
