@@ -102,7 +102,7 @@ export function App() {
         }
       } else if (msg.type === 'reconnected') {
         const t = threadRef.current
-        if (t?.existingTopic) loadHistory(t.existingTopic).catch(() => {})
+        if (t?.existingTopic) loadHistory(t.existingTopic, t.entity.entityUri).catch(() => {})
       }
     }
 
@@ -133,7 +133,7 @@ export function App() {
       } else if (t.existingTopic) {
         // Already resolved: skip re-init (SW tab map may be empty after restart),
         // just catch up on anything missed while the port was down.
-        loadHistory(t.existingTopic).catch(() => {})
+        loadHistory(t.existingTopic, t.entity.entityUri).catch(() => {})
       }
     }
 
@@ -153,11 +153,14 @@ export function App() {
     // A later push may have switched targets while we awaited; don't clobber it.
     if (targetRef.current.currentUri !== entity.entityUri) return
     setThread({ entity, key, existingTopic })
-    if (existingTopic) await loadHistory(existingTopic)
+    if (existingTopic) await loadHistory(existingTopic, entity.entityUri)
   }
 
-  async function loadHistory(topic: string) {
-    dispatch({ type: 'history', messages: await client.getMessages(config.channelName, topic) })
+  async function loadHistory(topic: string, forUri: string) {
+    const messages = await client.getMessages(config.channelName, topic)
+    // The user may have switched targets while the fetch was in flight.
+    if (targetRef.current.currentUri !== forUri) return
+    dispatch({ type: 'history', messages })
   }
 
   async function send(text: string) {
@@ -180,7 +183,7 @@ export function App() {
       await client.sendMessage(config.channelName, topic, text)
       drafts.clear(t.entity.entityUri)
       setDraft('')
-      await loadHistory(topic)
+      await loadHistory(topic, t.entity.entityUri)
     } catch (e) {
       setError(errText(e))
     }
