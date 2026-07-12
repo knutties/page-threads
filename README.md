@@ -45,3 +45,14 @@ build: `dev/run-chrome.sh user2 dist-user2`).
       messages live.
 - [ ] REST failures (e.g. stop the Zulip container, then send) show the dismissible
       error bar, and sending works again after the container is back.
+
+## M1a acceptance checklist
+
+- [ ] Switching tabs updates the panel to the new tab's thread without reopening.
+- [ ] In-page SPA navigation (e.g. clicking between YouTube videos) re-resolves within ~1 s.
+- [ ] 📌 Pin keeps the current thread while switching tabs; unpin catches up to the active tab.
+- [ ] Landing on a new-tab/chrome:// page keeps the last thread visible (default `onNonWebPage: 'hold'`).
+- [ ] A half-typed message survives a tab round-trip and never leaks into another page's composer.
+- [ ] While scrolled up reading history, an incoming message does NOT yank the view; at the bottom, it does scroll.
+- [ ] Enter in a CJK IME composition does not send.
+- [ ] When thread init fails (e.g. Zulip container stopped), the error bar shows Retry, and Retry recovers once the server is back.
