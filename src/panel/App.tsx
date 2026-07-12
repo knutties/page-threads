@@ -4,6 +4,7 @@ import type { PageEntity, PanelToSw, SwToPanel } from '../shared/messages'
 import { matchTopicByKey, topicKey, topicName } from '../shared/topic'
 import { ZulipClient } from '../shared/zulipClient'
 import { Composer } from './Composer'
+import { topicMatchesKey } from './eventMatch'
 import { ThreadView } from './ThreadView'
 import { threadReducer } from './threadState'
 
@@ -34,8 +35,11 @@ export function App() {
   threadRef.current = thread
 
   useEffect(() => {
-    const port = chrome.runtime.connect({ name: 'panel' })
-    port.onMessage.addListener((msg: SwToPanel) => {
+    let disposed = false
+    let port: chrome.runtime.Port
+    let pingTimer: number | undefined
+
+    const handleMessage = (msg: SwToPanel) => {
       if (msg.type === 'activeEntity') {
         if (msg.entity) {
           initThread(msg.entity).catch((e) => setError(errText(e)))
@@ -44,17 +48,52 @@ export function App() {
         }
       } else if (msg.type === 'newMessage') {
         const t = threadRef.current
-        if (t?.existingTopic && msg.topic === t.existingTopic) {
+        if (t && topicMatchesKey(msg.topic, t.key)) {
+          if (!t.existingTopic) setThread({ ...t, existingTopic: msg.topic })
           dispatch({ type: 'append', message: msg.message })
         }
       } else if (msg.type === 'reconnected') {
         const t = threadRef.current
         if (t?.existingTopic) loadHistory(t.existingTopic).catch(() => {})
       }
-    })
-    const req: PanelToSw = { type: 'getActiveEntity' }
-    port.postMessage(req)
-    return () => port.disconnect()
+    }
+
+    function connect(isReconnect: boolean) {
+      port = chrome.runtime.connect({ name: 'panel' })
+      port.onMessage.addListener(handleMessage)
+      // Port messages are what reset the MV3 service-worker idle timer; the
+      // long-poll fetch alone does not keep it alive. 20s < the 30s idle limit.
+      pingTimer = window.setInterval(() => {
+        try {
+          port.postMessage({ type: 'ping' } satisfies PanelToSw)
+        } catch {
+          // Port already dead; onDisconnect is about to fire.
+        }
+      }, 20_000)
+      port.onDisconnect.addListener(() => {
+        window.clearInterval(pingTimer)
+        if (disposed) return
+        // SW was torn down; reconnecting wakes it and restarts the event loop.
+        window.setTimeout(() => {
+          if (!disposed) connect(true)
+        }, 200)
+      })
+      const t = threadRef.current
+      if (!isReconnect || !t) {
+        port.postMessage({ type: 'getActiveEntity' } satisfies PanelToSw)
+      } else if (t.existingTopic) {
+        // Already resolved: skip re-init (SW tab map may be empty after restart),
+        // just catch up on anything missed while the port was down.
+        loadHistory(t.existingTopic).catch(() => {})
+      }
+    }
+
+    connect(false)
+    return () => {
+      disposed = true
+      window.clearInterval(pingTimer)
+      port.disconnect()
+    }
   }, [])
 
   async function initThread(entity: PageEntity) {
