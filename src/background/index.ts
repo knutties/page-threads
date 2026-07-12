@@ -21,10 +21,13 @@ function broadcast(msg: SwToPanel): void {
 }
 
 let lastPushedUri: string | null | undefined // undefined = nothing pushed yet
+let pushGeneration = 0
 
 async function pushActiveEntity(): Promise<void> {
+  const generation = ++pushGeneration
   try {
     const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true })
+    if (generation !== pushGeneration) return // a newer evaluation superseded this one
     const entity = tab?.id != null ? tabEntities.get(tab.id) ?? null : null
     const uri = entity?.entityUri ?? null
     if (uri !== lastPushedUri) {
