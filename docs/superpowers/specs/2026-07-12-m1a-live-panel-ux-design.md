@@ -51,7 +51,13 @@ event: { type: 'push'; entity: PageEntity | null }
 result: 'ignore' | 'switch' | 'clear'
 ```
 
-Rules: pinned → pushes ignored; unpinned push with same URI → ignore; different URI → switch (re-init thread, reset messages, load that thread's draft); null entity while unpinned → clear (empty "no page" state, composer disabled); unpin → re-request active entity.
+Rules: pinned → pushes ignored; unpinned push with same URI → ignore; different URI → switch (re-init thread, reset messages, load that thread's draft); unpin → re-request active entity.
+
+**Null entity while unpinned is configurable** (`onNonWebPage` setting): `'hold'` (default) keeps showing the last thread, read-only-ish (composer stays enabled — the thread is still real); `'clear'` empties the panel and disables the composer. Rationale for the default: glancing at a new-tab page or chrome:// screen shouldn't blank a thread you were reading.
+
+### Settings foundation (new, minimal)
+
+New `src/shared/settings.ts`: a typed read/write layer over `chrome.storage.local` with a defaults object and a `watch` helper (storage.onChanged). M1a defines `{ onNonWebPage: 'hold' | 'clear' }` (default `'hold'`). No settings UI in M1a — the toggle surfaces on M1d's options page; until then the stored value is respected and changeable via the service-worker console. This module is deliberately the same foundation M1b (credentials) and M1d (rules, defaults) will build on.
 
 Header gains a pin button (📌 toggling filled/outline, `title` text explains). Composer drafts: `Map<entityUri, string>` in panel memory; saved on thread switch, restored on arrival, entry cleared on successful send.
 
@@ -67,7 +73,7 @@ Auto-scroll in ThreadView: on `history` render, scroll to bottom; on `append`, s
 
 ## Testing
 
-- Unit (Vitest): `panelTarget` reducer (pin/unpin/push sequences incl. null entity), `shouldStickToBottom`, draft-map behavior, content-script dedupe/debounce logic (extracted pure: `NavWatcher` with injected timers), typed-response compile checks, EventLoop onReconnect-throw test.
+- Unit (Vitest): `panelTarget` reducer (pin/unpin/push sequences incl. null entity under both `onNonWebPage` modes), `settings.ts` defaults/merge logic (chrome.storage faked), `shouldStickToBottom`, draft-map behavior, content-script dedupe/debounce logic (extracted pure: `NavWatcher` with injected timers), typed-response compile checks, EventLoop onReconnect-throw test.
 - Manual checklist (README addition): tab switch updates panel; YouTube SPA navigation updates panel; pin holds thread while switching; unpin catches up; draft survives a tab round-trip; long thread doesn't yank scroll on new message while reading scrollback.
 
 ## Acceptance
