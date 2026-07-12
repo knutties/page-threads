@@ -30,6 +30,12 @@ build: `dev/run-chrome.sh user2 dist-user2`).
 > alone does NOT refresh the MV3 service worker — extension pages load fresh
 > from disk, but the old service worker keeps running, which can leave the
 > panel working while live updates silently use stale code.
+>
+> **After a `manifest.json` permissions change, ⟳ is NOT enough either:**
+> `--load-extension` fixes permission grants at browser launch, so a newly
+> added permission stays ungranted (`chrome.storage` = undefined, etc.) until
+> you fully quit and relaunch the browser. Also reload open tabs after any
+> extension reload — their old content scripts are orphaned.
 
 ## M0 acceptance checklist
 
