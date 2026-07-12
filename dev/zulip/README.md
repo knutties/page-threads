@@ -44,6 +44,9 @@ services:
       SETTING_EXTERNAL_HOST: "127.0.0.1:9090"
       SETTING_ZULIP_ADMINISTRATOR: "you@example.com"
       CERTIFICATES: "self-signed"
+      # EXTERNAL_HOST is an IP, which can't host Zulip's synthetic bot/user
+      # emails; without this, account registration 500s (InvalidFakeEmailDomainError).
+      SETTING_FAKE_EMAIL_DOMAIN: "zulipdev.example.com"
     ports: !override
       - "9090:443"
 ```
