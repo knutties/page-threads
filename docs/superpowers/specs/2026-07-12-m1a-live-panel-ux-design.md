@@ -31,6 +31,12 @@ The SW owns "what should the panel show." It keeps `activeEntityUri: string | nu
 
 Evaluation: query the active tab (`active: true, lastFocusedWindow: true`), look up its entity, and if the resulting `entityUri` differs from the last broadcast value, broadcast `{type: 'activeEntity', entity}` to all ports (null entity allowed — e.g. chrome:// pages). The existing `getActiveEntity` request/reply stays for panel startup.
 
+`tabEntities` is a cache, not the source of truth: on a lookup miss (the map
+dies with every MV3 service-worker restart) the SW queries the tab's content
+script (`queryEntity` message) and re-caches the reply. Tabs whose content
+scripts are orphaned by an extension reload (dev-only) still miss — reload
+those tabs.
+
 ### Content script (SPA navigation)
 
 On top of the existing load-time resolution:

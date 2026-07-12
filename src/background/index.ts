@@ -1,5 +1,5 @@
 import { config } from '../config'
-import type { ContentToSw, PageEntity, PanelToSw, SwToPanel } from '../shared/messages'
+import type { ContentToSw, PageEntity, PanelToSw, SwToContent, SwToPanel } from '../shared/messages'
 import { ZulipClient } from '../shared/zulipClient'
 import { EventLoop } from './eventLoop'
 
@@ -20,6 +20,23 @@ function broadcast(msg: SwToPanel): void {
   }
 }
 
+/** tabEntities is a cache; on a miss (SW restarted since the page loaded), ask the tab. */
+async function entityForTab(tabId: number): Promise<PageEntity | null> {
+  const cached = tabEntities.get(tabId)
+  if (cached) return cached
+  try {
+    const msg: SwToContent = { type: 'queryEntity' }
+    const entity = (await chrome.tabs.sendMessage(tabId, msg)) as PageEntity | undefined
+    if (entity) {
+      tabEntities.set(tabId, entity)
+      return entity
+    }
+  } catch {
+    // No content script in this tab: chrome:// page, or orphaned script after an extension reload.
+  }
+  return null
+}
+
 let lastPushedUri: string | null | undefined // undefined = nothing pushed yet
 let pushGeneration = 0
 
@@ -27,8 +44,8 @@ async function pushActiveEntity(): Promise<void> {
   const generation = ++pushGeneration
   try {
     const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true })
+    const entity = tab?.id != null ? await entityForTab(tab.id) : null
     if (generation !== pushGeneration) return // a newer evaluation superseded this one
-    const entity = tab?.id != null ? tabEntities.get(tab.id) ?? null : null
     const uri = entity?.entityUri ?? null
     if (uri !== lastPushedUri) {
       lastPushedUri = uri
@@ -73,8 +90,8 @@ chrome.runtime.onConnect.addListener((port) => {
     if (msg.type === 'getActiveEntity') {
       void chrome.tabs
         .query({ active: true, lastFocusedWindow: true })
-        .then(([tab]) => {
-          const entity = tab?.id != null ? tabEntities.get(tab.id) ?? null : null
+        .then(async ([tab]) => {
+          const entity = tab?.id != null ? await entityForTab(tab.id) : null
           const reply: SwToPanel = { type: 'activeEntity', entity }
           port.postMessage(reply)
         })

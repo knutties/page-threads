@@ -8,6 +8,9 @@ export interface PageEntity {
 /** Content script → service worker, via chrome.runtime.sendMessage. */
 export type ContentToSw = { type: 'pageEntity' } & PageEntity
 
+/** Service worker → content script, via chrome.tabs.sendMessage. */
+export type SwToContent = { type: 'queryEntity' }
+
 /** Panel → service worker, via the 'panel' Port. 'ping' exists solely to reset the MV3 service-worker idle timer. */
 export type PanelToSw = { type: 'getActiveEntity' } | { type: 'ping' }
 

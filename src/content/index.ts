@@ -1,5 +1,5 @@
 import { canonicalize } from '../shared/canonicalize'
-import type { ContentToSw } from '../shared/messages'
+import type { ContentToSw, SwToContent } from '../shared/messages'
 import { createNavWatcher } from './navWatcher'
 
 function resolveUri(): string {
@@ -44,3 +44,11 @@ if (navigation) {
     }
   }, 500)
 }
+
+// The SW's tab-entity map dies with every MV3 service-worker restart; let it
+// re-query this tab instead of silently losing the mapping.
+chrome.runtime.onMessage.addListener((msg: SwToContent, _sender, sendResponse) => {
+  if (msg.type === 'queryEntity') {
+    sendResponse({ entityUri: resolveUri(), title: document.title })
+  }
+})
