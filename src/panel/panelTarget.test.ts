@@ -54,4 +54,16 @@ describe('panelTarget', () => {
       action: 'refresh',
     })
   })
+
+  test('initFailed for the current uri forgets it so a re-push switches again', () => {
+    const failed = panelTarget(s(false, 'web:a'), { type: 'initFailed', uri: 'web:a' }, 'hold')
+    expect(failed).toEqual({ state: s(false, null), action: 'ignore' })
+    const retry = panelTarget(failed.state, { type: 'push', entity: entity('web:a') }, 'hold')
+    expect(retry.action).toBe('switch')
+  })
+
+  test('initFailed for a stale uri leaves state untouched', () => {
+    const r = panelTarget(s(false, 'web:b'), { type: 'initFailed', uri: 'web:a' }, 'hold')
+    expect(r).toEqual({ state: s(false, 'web:b'), action: 'ignore' })
+  })
 })

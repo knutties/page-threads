@@ -43,16 +43,10 @@ export function App() {
   threadRef.current = thread
   const targetRef = useRef<PanelTargetState>({ pinned: false, currentUri: null })
   const settingsRef = useRef<Settings>(DEFAULT_SETTINGS)
-  const draftRef = useRef('')
   const portRef = useRef<chrome.runtime.Port | null>(null)
 
-  function setDraft(text: string) {
-    draftRef.current = text
-    setDraftText(text)
-  }
-
   function onDraftInput(text: string) {
-    setDraft(text)
+    setDraftText(text)
     const uri = threadRef.current?.entity.entityUri
     if (uri) drafts.set(uri, text)
   }
@@ -72,12 +66,19 @@ export function App() {
       setError(null)
       setThread(null)
       dispatch({ type: 'history', messages: [] })
-      setDraft(drafts.get(entity.entityUri))
-      initThread(entity).catch((e) => setError(errText(e)))
+      setDraftText(drafts.get(entity.entityUri))
+      initThread(entity).catch((e) => {
+        setError(errText(e))
+        targetRef.current = panelTarget(
+          targetRef.current,
+          { type: 'initFailed', uri: entity.entityUri },
+          settingsRef.current.onNonWebPage
+        ).state
+      })
     } else if (action === 'clear') {
       setThread(null)
       dispatch({ type: 'history', messages: [] })
-      setDraft('')
+      setDraftText('')
     }
   }
 
@@ -182,7 +183,7 @@ export function App() {
       }
       await client.sendMessage(config.channelName, topic, text)
       drafts.clear(t.entity.entityUri)
-      setDraft('')
+      if (targetRef.current.currentUri === t.entity.entityUri) setDraftText('')
       await loadHistory(topic, t.entity.entityUri)
     } catch (e) {
       setError(errText(e))

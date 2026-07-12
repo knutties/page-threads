@@ -9,6 +9,7 @@ export type PanelTargetEvent =
   | { type: 'push'; entity: PageEntity | null }
   | { type: 'pin' }
   | { type: 'unpin' }
+  | { type: 'initFailed'; uri: string }
 
 export type PanelTargetAction = 'ignore' | 'switch' | 'clear' | 'refresh'
 
@@ -38,5 +39,12 @@ export function panelTarget(
       if (uri === state.currentUri) return { state, action: 'ignore' }
       return { state: { ...state, currentUri: uri }, action: 'switch' }
     }
+    case 'initFailed':
+      // Forget a target whose initialization failed so the next push of the
+      // same uri produces 'switch' again (Retry depends on this).
+      if (state.currentUri === event.uri) {
+        return { state: { ...state, currentUri: null }, action: 'ignore' }
+      }
+      return { state, action: 'ignore' }
   }
 }
