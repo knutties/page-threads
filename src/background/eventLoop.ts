@@ -34,14 +34,21 @@ export class EventLoop {
         backoff = INITIAL_BACKOFF_MS
         for (const event of events) {
           if (event.id > queue.lastEventId) queue.lastEventId = event.id
-          if (this.running) this.hooks.onEvent(event)
+          if (!this.running) break
+          try {
+            this.hooks.onEvent(event)
+          } catch {
+            // A consumer bug must not kill the loop or drop the rest of the batch.
+          }
         }
       } catch (e) {
         if (!this.running) return
         if (e instanceof ZulipError && e.code === 'BAD_EVENT_QUEUE_ID') {
+          const hadQueue = queue !== null
           queue = null
           this.hooks.onReconnect?.()
-          continue
+          if (hadQueue) continue // stale queue: re-register immediately
+          // register() itself failed with this code: fall through to backoff
         }
         await sleep(backoff)
         backoff = Math.min(backoff * 2, MAX_BACKOFF_MS)
