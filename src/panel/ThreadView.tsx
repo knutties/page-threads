@@ -1,12 +1,38 @@
+import { useEffect, useRef } from 'preact/hooks'
 import type { ZulipMessage } from '../shared/zulipClient'
 import { splitLinks } from './linkify'
+import { shouldStickToBottom } from './scroll'
 
-export function ThreadView({ messages, hasThread }: { messages: ZulipMessage[]; hasThread: boolean }) {
+export function ThreadView({
+  messages,
+  hasThread,
+  noPage,
+}: {
+  messages: ZulipMessage[]
+  hasThread: boolean
+  noPage: boolean
+}) {
+  const listRef = useRef<HTMLUListElement>(null)
+  const prevCount = useRef(0)
+
+  useEffect(() => {
+    const el = listRef.current
+    if (!el) return
+    // Thread switch (list replaced/shrunk) always jumps to bottom; live appends
+    // only stick when the reader was already near the bottom.
+    const replaced = prevCount.current === 0 || messages.length < prevCount.current
+    if (replaced || shouldStickToBottom(el.scrollTop, el.scrollHeight, el.clientHeight)) {
+      el.scrollTop = el.scrollHeight
+    }
+    prevCount.current = messages.length
+  }, [messages])
+
+  if (noPage) return <div class="empty">Open a web page to see its discussion.</div>
   if (!hasThread && messages.length === 0) {
     return <div class="empty">No discussion yet. Start one.</div>
   }
   return (
-    <ul class="messages">
+    <ul class="messages" ref={listRef}>
       {messages.map((m) => (
         <li key={m.id}>
           <div class="meta">

@@ -32,3 +32,11 @@ header {
 .composer { display: flex; gap: 8px; padding: 8px 12px; border-top: 1px solid #ddd; }
 .composer textarea { flex: 1; resize: none; height: 60px; padding: 6px; }
 .composer button { align-self: flex-end; }
+
+header { display: flex; align-items: center; gap: 8px; }
+header .title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pin { border: none; background: none; cursor: pointer; opacity: 0.35; font-size: 14px; padding: 2px; }
+.pin.pinned { opacity: 1; }
+.error { display: flex; align-items: center; gap: 8px; }
+.error > span { flex: 1; }
+.error .retry { flex: none; }

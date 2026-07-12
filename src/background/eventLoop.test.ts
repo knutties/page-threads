@@ -145,4 +145,25 @@ describe('EventLoop', () => {
     expect(registers).toBe(2)
     expect(sleeps).toEqual([1000])
   })
+
+  test('an onReconnect exception does not kill the loop', async () => {
+    let registrations = 0
+    let loop: EventLoop
+    const client = {
+      register: async () => ({ queueId: `q${++registrations}`, lastEventId: -1 }),
+      getEvents: async (queueId: string) => {
+        if (queueId === 'q1') throw new ZulipError('bad', 'BAD_EVENT_QUEUE_ID')
+        loop.stop()
+        return []
+      },
+    }
+    loop = new EventLoop(client, 'web-threads', {
+      onEvent: () => {},
+      onReconnect: () => {
+        throw new Error('consumer bug')
+      },
+    })
+    await loop.start()
+    expect(registrations).toBe(2) // survived the throw and re-registered
+  })
 })

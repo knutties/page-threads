@@ -31,6 +31,12 @@ The SW owns "what should the panel show." It keeps `activeEntityUri: string | nu
 
 Evaluation: query the active tab (`active: true, lastFocusedWindow: true`), look up its entity, and if the resulting `entityUri` differs from the last broadcast value, broadcast `{type: 'activeEntity', entity}` to all ports (null entity allowed — e.g. chrome:// pages). The existing `getActiveEntity` request/reply stays for panel startup.
 
+`tabEntities` is a cache, not the source of truth: on a lookup miss (the map
+dies with every MV3 service-worker restart) the SW queries the tab's content
+script (`queryEntity` message) and re-caches the reply. Tabs whose content
+scripts are orphaned by an extension reload (dev-only) still miss — reload
+those tabs.
+
 ### Content script (SPA navigation)
 
 On top of the existing load-time resolution:
@@ -57,7 +63,7 @@ Rules: pinned → pushes ignored; unpinned push with same URI → ignore; differ
 
 ### Settings foundation (new, minimal)
 
-New `src/shared/settings.ts`: a typed read/write layer over `chrome.storage.local` with a defaults object and a `watch` helper (storage.onChanged). M1a defines `{ onNonWebPage: 'hold' | 'clear' }` (default `'hold'`). No settings UI in M1a — the toggle surfaces on M1d's options page; until then the stored value is respected and changeable via the service-worker console. This module is deliberately the same foundation M1b (credentials) and M1d (rules, defaults) will build on.
+New `src/shared/settings.ts`: a typed read/write layer over `chrome.storage.local` with a defaults object and a `watch` helper (storage.onChanged). **Requires adding `"storage"` to the manifest's `permissions`** (M0 shipped `["sidePanel"]` only; without it `chrome.storage` is undefined and the panel crashes blank at load — found in M1a manual acceptance). M1a defines `{ onNonWebPage: 'hold' | 'clear' }` (default `'hold'`). No settings UI in M1a — the toggle surfaces on M1d's options page; until then the stored value is respected and changeable via the service-worker console. This module is deliberately the same foundation M1b (credentials) and M1d (rules, defaults) will build on.
 
 Header gains a pin button (📌 toggling filled/outline, `title` text explains). Composer drafts: `Map<entityUri, string>` in panel memory; saved on thread switch, restored on arrival, entry cleared on successful send.
 

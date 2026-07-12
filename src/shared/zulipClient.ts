@@ -19,6 +19,36 @@ export interface ZulipEvent {
   message?: ZulipMessage
 }
 
+interface ZulipSuccess {
+  result: 'success'
+  msg: string
+}
+
+export interface GetStreamIdResponse extends ZulipSuccess {
+  stream_id: number
+}
+
+export interface GetTopicsResponse extends ZulipSuccess {
+  topics: Array<{ name: string; max_id: number }>
+}
+
+export interface GetMessagesResponse extends ZulipSuccess {
+  messages: ZulipMessage[]
+}
+
+export interface SendMessageResponse extends ZulipSuccess {
+  id: number
+}
+
+export interface RegisterResponse extends ZulipSuccess {
+  queue_id: string
+  last_event_id: number
+}
+
+export interface GetEventsResponse extends ZulipSuccess {
+  events: ZulipEvent[]
+}
+
 export class ZulipError extends Error {
   constructor(msg: string, readonly code?: string) {
     super(msg)
@@ -35,11 +65,11 @@ export class ZulipClient {
     this.fetchFn = (fetchFn ?? fetch).bind(globalThis)
   }
 
-  private async request(
+  private async request<T>(
     method: 'GET' | 'POST',
     path: string,
     params?: Record<string, unknown>
-  ): Promise<any> {
+  ): Promise<T> {
     const url = new URL(`/api/v1${path}`, this.cfg.realmUrl)
     const init: RequestInit = {
       method,
@@ -58,20 +88,20 @@ export class ZulipClient {
     if (!res.ok || data.result !== 'success') {
       throw new ZulipError(data.msg ?? `HTTP ${res.status}`, data.code)
     }
-    return data
+    return data as T
   }
 
   async getStreamId(name: string): Promise<number> {
-    return (await this.request('GET', '/get_stream_id', { stream: name })).stream_id
+    return (await this.request<GetStreamIdResponse>('GET', '/get_stream_id', { stream: name })).stream_id
   }
 
   async getTopics(streamId: number): Promise<string[]> {
-    const data = await this.request('GET', `/users/me/${streamId}/topics`)
-    return data.topics.map((t: { name: string }) => t.name)
+    const data = await this.request<GetTopicsResponse>('GET', `/users/me/${streamId}/topics`)
+    return data.topics.map((t) => t.name)
   }
 
   async getMessages(channel: string, topic: string): Promise<ZulipMessage[]> {
-    const data = await this.request('GET', '/messages', {
+    const data = await this.request<GetMessagesResponse>('GET', '/messages', {
       anchor: 'newest',
       num_before: 50,
       num_after: 0,
@@ -85,7 +115,7 @@ export class ZulipClient {
   }
 
   async sendMessage(channel: string, topic: string, content: string): Promise<number> {
-    const data = await this.request('POST', '/messages', {
+    const data = await this.request<SendMessageResponse>('POST', '/messages', {
       type: 'stream',
       to: channel,
       topic,
@@ -95,7 +125,7 @@ export class ZulipClient {
   }
 
   async register(channel: string): Promise<{ queueId: string; lastEventId: number }> {
-    const data = await this.request('POST', '/register', {
+    const data = await this.request<RegisterResponse>('POST', '/register', {
       event_types: ['message'],
       narrow: [['channel', channel]],
     })
@@ -103,7 +133,7 @@ export class ZulipClient {
   }
 
   async getEvents(queueId: string, lastEventId: number): Promise<ZulipEvent[]> {
-    const data = await this.request('GET', '/events', {
+    const data = await this.request<GetEventsResponse>('GET', '/events', {
       queue_id: queueId,
       last_event_id: lastEventId,
     })

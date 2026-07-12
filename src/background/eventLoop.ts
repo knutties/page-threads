@@ -46,7 +46,11 @@ export class EventLoop {
         if (e instanceof ZulipError && e.code === 'BAD_EVENT_QUEUE_ID') {
           const hadQueue = queue !== null
           queue = null
-          this.hooks.onReconnect?.()
+          try {
+            this.hooks.onReconnect?.()
+          } catch {
+            // A consumer bug must not kill the loop (mirrors the onEvent guard).
+          }
           if (hadQueue) continue // stale queue: re-register immediately
           // register() itself failed with this code: fall through to backoff
         }

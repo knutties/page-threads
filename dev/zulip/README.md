@@ -9,6 +9,9 @@ the local server uses a **self-signed certificate**: `https://127.0.0.1:9090`.
 You accept the certificate warning once per Chrome profile; after that both the
 Zulip web app and the extension's API calls work.
 
+> Note: the extension uses the `channel` narrow operator, which requires
+> Zulip Server ≥ 9.0. docker-zulip's default image satisfies this.
+
 ## First-time setup
 
 Clone upstream into this directory (the clone is gitignored):

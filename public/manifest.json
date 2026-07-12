@@ -1,11 +1,11 @@
 {
   "manifest_version": 3,
   "name": "PageThreads",
-  "version": "0.0.1",
-  "description": "Zulip-backed discussion threads for any web page (M0 walking skeleton)",
+  "version": "0.1.0",
+  "description": "Zulip-backed discussion threads for any web page",
   "action": { "default_title": "PageThreads" },
   "side_panel": { "default_path": "src/panel/index.html" },
-  "permissions": ["sidePanel"],
+  "permissions": ["sidePanel", "storage"],
   "host_permissions": ["<all_urls>"],
   "background": { "service_worker": "background.js", "type": "module" },
   "content_scripts": [

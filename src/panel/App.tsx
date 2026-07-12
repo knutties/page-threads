@@ -1,14 +1,19 @@
 import { useEffect, useReducer, useRef, useState } from 'preact/hooks'
 import { config } from '../config'
 import type { PageEntity, PanelToSw, SwToPanel } from '../shared/messages'
+import { createSettingsStore, DEFAULT_SETTINGS, type Settings } from '../shared/settings'
 import { matchTopicByKey, topicKey, topicName } from '../shared/topic'
 import { ZulipClient } from '../shared/zulipClient'
 import { Composer } from './Composer'
+import { Drafts } from './drafts'
 import { topicMatchesKey } from './eventMatch'
+import { panelTarget, type PanelTargetState } from './panelTarget'
 import { ThreadView } from './ThreadView'
 import { threadReducer } from './threadState'
 
 const client = new ZulipClient(config)
+const drafts = new Drafts()
+const settingsStore = createSettingsStore()
 
 interface Thread {
   entity: PageEntity
@@ -31,8 +36,56 @@ export function App() {
   const [thread, setThread] = useState<Thread | null>(null)
   const [messages, dispatch] = useReducer(threadReducer, [])
   const [error, setError] = useState<string | null>(null)
+  const [pinned, setPinned] = useState(false)
+  const [draftText, setDraftText] = useState('')
+
   const threadRef = useRef<Thread | null>(null)
   threadRef.current = thread
+  const targetRef = useRef<PanelTargetState>({ pinned: false, currentUri: null })
+  const settingsRef = useRef<Settings>(DEFAULT_SETTINGS)
+  const portRef = useRef<chrome.runtime.Port | null>(null)
+
+  function onDraftInput(text: string) {
+    setDraftText(text)
+    const uri = threadRef.current?.entity.entityUri
+    if (uri) drafts.set(uri, text)
+  }
+
+  function requestActiveEntity() {
+    portRef.current?.postMessage({ type: 'getActiveEntity' } satisfies PanelToSw)
+  }
+
+  function applyPush(entity: PageEntity | null) {
+    const { state, action } = panelTarget(
+      targetRef.current,
+      { type: 'push', entity },
+      settingsRef.current.onNonWebPage
+    )
+    targetRef.current = state
+    if (action === 'switch' && entity) {
+      setError(null)
+      setThread(null)
+      dispatch({ type: 'history', messages: [] })
+      setDraftText(drafts.get(entity.entityUri))
+      initThread(entity).catch((e) => {
+        setError(errText(e))
+        targetRef.current = panelTarget(
+          targetRef.current,
+          { type: 'initFailed', uri: entity.entityUri },
+          settingsRef.current.onNonWebPage
+        ).state
+      })
+    } else if (action === 'clear') {
+      setThread(null)
+      dispatch({ type: 'history', messages: [] })
+      setDraftText('')
+    }
+  }
+
+  useEffect(() => {
+    void settingsStore.load().then((s) => (settingsRef.current = s))
+    return settingsStore.watch((s) => (settingsRef.current = s))
+  }, [])
 
   useEffect(() => {
     let disposed = false
@@ -41,11 +94,7 @@ export function App() {
 
     const handleMessage = (msg: SwToPanel) => {
       if (msg.type === 'activeEntity') {
-        if (msg.entity) {
-          initThread(msg.entity).catch((e) => setError(errText(e)))
-        } else {
-          setError('No page detected. Reload the tab, then reopen the panel.')
-        }
+        applyPush(msg.entity)
       } else if (msg.type === 'newMessage') {
         const t = threadRef.current
         if (t && topicMatchesKey(msg.topic, t.key)) {
@@ -54,12 +103,13 @@ export function App() {
         }
       } else if (msg.type === 'reconnected') {
         const t = threadRef.current
-        if (t?.existingTopic) loadHistory(t.existingTopic).catch(() => {})
+        if (t?.existingTopic) loadHistory(t.existingTopic, t.entity.entityUri).catch(() => {})
       }
     }
 
     function connect(isReconnect: boolean) {
       port = chrome.runtime.connect({ name: 'panel' })
+      portRef.current = port
       port.onMessage.addListener(handleMessage)
       // Port messages are what reset the MV3 service-worker idle timer; the
       // long-poll fetch alone does not keep it alive. 20s < the 30s idle limit.
@@ -84,7 +134,7 @@ export function App() {
       } else if (t.existingTopic) {
         // Already resolved: skip re-init (SW tab map may be empty after restart),
         // just catch up on anything missed while the port was down.
-        loadHistory(t.existingTopic).catch(() => {})
+        loadHistory(t.existingTopic, t.entity.entityUri).catch(() => {})
       }
     }
 
@@ -101,12 +151,17 @@ export function App() {
     const streamId = await client.getStreamId(config.channelName)
     const topics = await client.getTopics(streamId)
     const existingTopic = matchTopicByKey(topics, key)
+    // A later push may have switched targets while we awaited; don't clobber it.
+    if (targetRef.current.currentUri !== entity.entityUri) return
     setThread({ entity, key, existingTopic })
-    if (existingTopic) await loadHistory(existingTopic)
+    if (existingTopic) await loadHistory(existingTopic, entity.entityUri)
   }
 
-  async function loadHistory(topic: string) {
-    dispatch({ type: 'history', messages: await client.getMessages(config.channelName, topic) })
+  async function loadHistory(topic: string, forUri: string) {
+    const messages = await client.getMessages(config.channelName, topic)
+    // The user may have switched targets while the fetch was in flight.
+    if (targetRef.current.currentUri !== forUri) return
+    dispatch({ type: 'history', messages })
   }
 
   async function send(text: string) {
@@ -127,22 +182,48 @@ export function App() {
         setThread({ ...t, existingTopic: topic })
       }
       await client.sendMessage(config.channelName, topic, text)
-      await loadHistory(topic)
+      drafts.clear(t.entity.entityUri)
+      if (targetRef.current.currentUri === t.entity.entityUri) setDraftText('')
+      await loadHistory(topic, t.entity.entityUri)
     } catch (e) {
       setError(errText(e))
     }
   }
 
+  function togglePin() {
+    const event = targetRef.current.pinned ? ({ type: 'unpin' } as const) : ({ type: 'pin' } as const)
+    const { state, action } = panelTarget(targetRef.current, event, settingsRef.current.onNonWebPage)
+    targetRef.current = state
+    setPinned(state.pinned)
+    if (action === 'refresh') requestActiveEntity()
+  }
+
   return (
     <div class="app">
-      <header title={thread?.entity.entityUri}>{thread ? thread.entity.title : 'PageThreads'}</header>
+      <header title={thread?.entity.entityUri}>
+        <span class="title">{thread ? thread.entity.title : 'PageThreads'}</span>
+        <button
+          class={pinned ? 'pin pinned' : 'pin'}
+          title={pinned ? 'Unpin: follow the active tab' : 'Pin: keep this thread while browsing'}
+          onClick={togglePin}
+        >
+          📌
+        </button>
+      </header>
       {error && (
-        <div class="error" role="alert" onClick={() => setError(null)}>
-          {error} <small>(click to dismiss)</small>
+        <div class="error" role="alert">
+          <span onClick={() => setError(null)}>
+            {error} <small>(click to dismiss)</small>
+          </span>
+          {!thread && (
+            <button class="retry" onClick={requestActiveEntity}>
+              Retry
+            </button>
+          )}
         </div>
       )}
-      <ThreadView messages={messages} hasThread={!!thread?.existingTopic} />
-      <Composer onSend={(text) => void send(text)} disabled={!thread} />
+      <ThreadView messages={messages} hasThread={!!thread?.existingTopic} noPage={!thread && !error} />
+      <Composer value={draftText} onInput={onDraftInput} onSend={(text) => void send(text)} disabled={!thread} />
     </div>
   )
 }
