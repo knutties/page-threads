@@ -27,7 +27,13 @@ export class ZulipError extends Error {
 }
 
 export class ZulipClient {
-  constructor(private cfg: ZulipConfig, private fetchFn: typeof fetch = fetch) {}
+  private fetchFn: typeof fetch
+
+  constructor(private cfg: ZulipConfig, fetchFn?: typeof fetch) {
+    // Calling `this.fetchFn(...)` would hand the browser's fetch a foreign
+    // receiver ("Illegal invocation"); pin the receiver to globalThis.
+    this.fetchFn = (fetchFn ?? fetch).bind(globalThis)
+  }
 
   private async request(
     method: 'GET' | 'POST',

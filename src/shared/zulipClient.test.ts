@@ -12,6 +12,34 @@ function fakeFetch(payload: unknown, status = 200) {
   return { fn, calls }
 }
 
+describe('fetch receiver', () => {
+  test('never invokes fetchFn with a foreign this (browser fetch throws Illegal invocation)', async () => {
+    function strictFetch(this: unknown, _url: RequestInfo | URL, _init?: RequestInit) {
+      if (this !== undefined && this !== globalThis) {
+        throw new TypeError("Failed to execute 'fetch' on 'Window': Illegal invocation")
+      }
+      return Promise.resolve(new Response(JSON.stringify({ result: 'success', stream_id: 1 })))
+    }
+    await expect(new ZulipClient(cfg, strictFetch as typeof fetch).getStreamId('x')).resolves.toBe(1)
+  })
+
+  test('default fetch path never binds a foreign this either', async () => {
+    function strictGlobalFetch(this: unknown) {
+      if (this !== undefined && this !== globalThis) {
+        throw new TypeError("Failed to execute 'fetch' on 'Window': Illegal invocation")
+      }
+      return Promise.resolve(new Response(JSON.stringify({ result: 'success', stream_id: 2 })))
+    }
+    const original = globalThis.fetch
+    globalThis.fetch = strictGlobalFetch as typeof fetch
+    try {
+      await expect(new ZulipClient(cfg).getStreamId('x')).resolves.toBe(2)
+    } finally {
+      globalThis.fetch = original
+    }
+  })
+})
+
 describe('auth and encoding', () => {
   test('sends HTTP basic auth header', async () => {
     const { fn, calls } = fakeFetch({ result: 'success', stream_id: 7 })
