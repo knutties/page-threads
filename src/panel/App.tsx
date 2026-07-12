@@ -31,6 +31,7 @@ export function App() {
   const [thread, setThread] = useState<Thread | null>(null)
   const [messages, dispatch] = useReducer(threadReducer, [])
   const [error, setError] = useState<string | null>(null)
+  const [draft, setDraft] = useState('')
   const threadRef = useRef<Thread | null>(null)
   threadRef.current = thread
 
@@ -142,7 +143,7 @@ export function App() {
         </div>
       )}
       <ThreadView messages={messages} hasThread={!!thread?.existingTopic} />
-      <Composer onSend={(text) => void send(text)} disabled={!thread} />
+      <Composer value={draft} onInput={setDraft} onSend={(text) => { void send(text); setDraft('') }} disabled={!thread} />
     </div>
   )
 }
