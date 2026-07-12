@@ -11,7 +11,13 @@ const client = new ZulipClient(config)
 let loop: EventLoop | null = null
 
 function broadcast(msg: SwToPanel): void {
-  for (const port of ports) port.postMessage(msg)
+  for (const port of ports) {
+    try {
+      port.postMessage(msg)
+    } catch {
+      ports.delete(port) // postMessage throws once the port is gone; drop it
+    }
+  }
 }
 
 chrome.runtime.onMessage.addListener((msg: ContentToSw, sender) => {
@@ -40,11 +46,20 @@ chrome.runtime.onConnect.addListener((port) => {
 
   port.onMessage.addListener((msg: PanelToSw) => {
     if (msg.type === 'getActiveEntity') {
-      void chrome.tabs.query({ active: true, lastFocusedWindow: true }).then(([tab]) => {
-        const entity = tab?.id != null ? tabEntities.get(tab.id) ?? null : null
-        const reply: SwToPanel = { type: 'activeEntity', entity }
-        port.postMessage(reply)
-      })
+      void chrome.tabs
+        .query({ active: true, lastFocusedWindow: true })
+        .then(([tab]) => {
+          const entity = tab?.id != null ? tabEntities.get(tab.id) ?? null : null
+          const reply: SwToPanel = { type: 'activeEntity', entity }
+          port.postMessage(reply)
+        })
+        .catch(() => {
+          try {
+            port.postMessage({ type: 'activeEntity', entity: null } satisfies SwToPanel)
+          } catch {
+            // port already gone; nothing to reply to
+          }
+        })
     }
   })
 
