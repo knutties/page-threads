@@ -1,14 +1,19 @@
 import { useEffect, useReducer, useRef, useState } from 'preact/hooks'
 import { config } from '../config'
 import type { PageEntity, PanelToSw, SwToPanel } from '../shared/messages'
+import { createSettingsStore, DEFAULT_SETTINGS, type Settings } from '../shared/settings'
 import { matchTopicByKey, topicKey, topicName } from '../shared/topic'
 import { ZulipClient } from '../shared/zulipClient'
 import { Composer } from './Composer'
+import { Drafts } from './drafts'
 import { topicMatchesKey } from './eventMatch'
+import { panelTarget, type PanelTargetState } from './panelTarget'
 import { ThreadView } from './ThreadView'
 import { threadReducer } from './threadState'
 
 const client = new ZulipClient(config)
+const drafts = new Drafts()
+const settingsStore = createSettingsStore()
 
 interface Thread {
   entity: PageEntity
@@ -31,9 +36,55 @@ export function App() {
   const [thread, setThread] = useState<Thread | null>(null)
   const [messages, dispatch] = useReducer(threadReducer, [])
   const [error, setError] = useState<string | null>(null)
-  const [draft, setDraft] = useState('')
+  const [pinned, setPinned] = useState(false)
+  const [draftText, setDraftText] = useState('')
+
   const threadRef = useRef<Thread | null>(null)
   threadRef.current = thread
+  const targetRef = useRef<PanelTargetState>({ pinned: false, currentUri: null })
+  const settingsRef = useRef<Settings>(DEFAULT_SETTINGS)
+  const draftRef = useRef('')
+  const portRef = useRef<chrome.runtime.Port | null>(null)
+
+  function setDraft(text: string) {
+    draftRef.current = text
+    setDraftText(text)
+  }
+
+  function onDraftInput(text: string) {
+    setDraft(text)
+    const uri = threadRef.current?.entity.entityUri
+    if (uri) drafts.set(uri, text)
+  }
+
+  function requestActiveEntity() {
+    portRef.current?.postMessage({ type: 'getActiveEntity' } satisfies PanelToSw)
+  }
+
+  function applyPush(entity: PageEntity | null) {
+    const { state, action } = panelTarget(
+      targetRef.current,
+      { type: 'push', entity },
+      settingsRef.current.onNonWebPage
+    )
+    targetRef.current = state
+    if (action === 'switch' && entity) {
+      setError(null)
+      setThread(null)
+      dispatch({ type: 'history', messages: [] })
+      setDraft(drafts.get(entity.entityUri))
+      initThread(entity).catch((e) => setError(errText(e)))
+    } else if (action === 'clear') {
+      setThread(null)
+      dispatch({ type: 'history', messages: [] })
+      setDraft('')
+    }
+  }
+
+  useEffect(() => {
+    void settingsStore.load().then((s) => (settingsRef.current = s))
+    return settingsStore.watch((s) => (settingsRef.current = s))
+  }, [])
 
   useEffect(() => {
     let disposed = false
@@ -42,11 +93,7 @@ export function App() {
 
     const handleMessage = (msg: SwToPanel) => {
       if (msg.type === 'activeEntity') {
-        if (msg.entity) {
-          initThread(msg.entity).catch((e) => setError(errText(e)))
-        } else {
-          setError('No page detected. Reload the tab, then reopen the panel.')
-        }
+        applyPush(msg.entity)
       } else if (msg.type === 'newMessage') {
         const t = threadRef.current
         if (t && topicMatchesKey(msg.topic, t.key)) {
@@ -61,6 +108,7 @@ export function App() {
 
     function connect(isReconnect: boolean) {
       port = chrome.runtime.connect({ name: 'panel' })
+      portRef.current = port
       port.onMessage.addListener(handleMessage)
       // Port messages are what reset the MV3 service-worker idle timer; the
       // long-poll fetch alone does not keep it alive. 20s < the 30s idle limit.
@@ -102,6 +150,8 @@ export function App() {
     const streamId = await client.getStreamId(config.channelName)
     const topics = await client.getTopics(streamId)
     const existingTopic = matchTopicByKey(topics, key)
+    // A later push may have switched targets while we awaited; don't clobber it.
+    if (targetRef.current.currentUri !== entity.entityUri) return
     setThread({ entity, key, existingTopic })
     if (existingTopic) await loadHistory(existingTopic)
   }
@@ -128,22 +178,48 @@ export function App() {
         setThread({ ...t, existingTopic: topic })
       }
       await client.sendMessage(config.channelName, topic, text)
+      drafts.clear(t.entity.entityUri)
+      setDraft('')
       await loadHistory(topic)
     } catch (e) {
       setError(errText(e))
     }
   }
 
+  function togglePin() {
+    const event = targetRef.current.pinned ? ({ type: 'unpin' } as const) : ({ type: 'pin' } as const)
+    const { state, action } = panelTarget(targetRef.current, event, settingsRef.current.onNonWebPage)
+    targetRef.current = state
+    setPinned(state.pinned)
+    if (action === 'refresh') requestActiveEntity()
+  }
+
   return (
     <div class="app">
-      <header title={thread?.entity.entityUri}>{thread ? thread.entity.title : 'PageThreads'}</header>
+      <header title={thread?.entity.entityUri}>
+        <span class="title">{thread ? thread.entity.title : 'PageThreads'}</span>
+        <button
+          class={pinned ? 'pin pinned' : 'pin'}
+          title={pinned ? 'Unpin: follow the active tab' : 'Pin: keep this thread while browsing'}
+          onClick={togglePin}
+        >
+          📌
+        </button>
+      </header>
       {error && (
-        <div class="error" role="alert" onClick={() => setError(null)}>
-          {error} <small>(click to dismiss)</small>
+        <div class="error" role="alert">
+          <span onClick={() => setError(null)}>
+            {error} <small>(click to dismiss)</small>
+          </span>
+          {!thread && (
+            <button class="retry" onClick={requestActiveEntity}>
+              Retry
+            </button>
+          )}
         </div>
       )}
-      <ThreadView messages={messages} hasThread={!!thread?.existingTopic} />
-      <Composer value={draft} onInput={setDraft} onSend={(text) => { void send(text); setDraft('') }} disabled={!thread} />
+      <ThreadView messages={messages} hasThread={!!thread?.existingTopic} noPage={!thread && !error} />
+      <Composer value={draftText} onInput={onDraftInput} onSend={(text) => void send(text)} disabled={!thread} />
     </div>
   )
 }
