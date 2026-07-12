@@ -3,6 +3,12 @@
 Uses [zulip/docker-zulip](https://github.com/zulip/docker-zulip). Test traffic never
 leaves your machine.
 
+Zulip 12 refuses direct plain-HTTP access (it requires a TLS-terminating reverse
+proxy sending `X-Forwarded-Proto: https` — a browser can never satisfy that), so
+the local server uses a **self-signed certificate**: `https://127.0.0.1:9090`.
+You accept the certificate warning once per Chrome profile; after that both the
+Zulip web app and the extension's API calls work.
+
 ## First-time setup
 
 Clone upstream into this directory (the clone is gitignored):
@@ -34,12 +40,12 @@ secrets:
 services:
   zulip:
     environment:
-      SETTING_EXTERNAL_HOST: "localhost:9090"
+      # Must contain a dot ("localhost:9090" fails Zulip's E002 check).
+      SETTING_EXTERNAL_HOST: "127.0.0.1:9090"
       SETTING_ZULIP_ADMINISTRATOR: "you@example.com"
-      # CERTIFICATES unset -> container serves plain HTTP on port 80.
-      # Chrome treats http://localhost as a secure context, so no TLS needed.
+      CERTIFICATES: "self-signed"
     ports: !override
-      - "9090:80"
+      - "9090:443"
 ```
 
 Generate throwaway secrets into `.env` (same directory):
@@ -63,19 +69,20 @@ docker compose exec zulip \
   sudo -u zulip /home/zulip/deployments/current/manage.py generate_realm_creation_link
 ```
 
-Open the printed link (replace its host with `localhost:9090` if needed) and create
-the organization and your admin account.
+Open the printed `https://127.0.0.1:9090/new/…` link, click through the
+certificate warning (Advanced → Proceed), and create the organization and your
+admin account.
 
 > `docker compose logs -f zulip` shows first-boot progress (migrations take a
 > couple of minutes before the web server answers).
 
 ## Per-realm setup for PageThreads
 
-1. In Zulip (http://localhost:9090): create a channel named **web-threads**
+1. In Zulip (https://127.0.0.1:9090): create a channel named **web-threads**
    (gear icon → Channel settings → Create channel). Subscribe yourself.
 2. Personal settings → Account & privacy → API key → copy it.
 3. In this repo: `cp src/config.example.ts src/config.ts` and fill in
-   `realmUrl: 'http://localhost:9090'`, your email, the API key.
+   `realmUrl: 'https://127.0.0.1:9090'`, your email, the API key.
 
 ## Second test user (for the live-updates acceptance check)
 
@@ -83,5 +90,8 @@ Invite a second user (Settings → Users → Invite) or reuse the realm-creation
 give them their own API key, and use them from a second Chrome profile with its own
 `src/config.ts` build — or simply post as them from the Zulip web UI.
 
-Note: the local server has no outgoing email, so prefer the realm-creation-link
-flow (`generate_realm_creation_link`) or `manage.py create_user` over email invites.
+Notes:
+- The local server has no outgoing email, so prefer the realm-creation-link flow
+  (`generate_realm_creation_link`) or `manage.py create_user` over email invites.
+- Each additional Chrome profile must also visit https://127.0.0.1:9090 once and
+  accept the certificate before the extension's API calls will succeed there.
