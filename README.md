@@ -21,6 +21,16 @@ Backend for development: see [dev/zulip/README.md](dev/zulip/README.md).
 2. Navigate to any http(s) page, click the PageThreads toolbar icon to open the
    side panel.
 
+If your managed Chrome blocks unpacked extensions, use `dev/run-chrome.sh`
+(Chrome for Testing with the extension pre-loaded; second profile + second-user
+build: `dev/run-chrome.sh user2 dist-user2`).
+
+> **After every `npm run build`, reload the extension** (chrome://extensions →
+> ⟳ on the PageThreads card) or wipe the dev profile. Relaunching the browser
+> alone does NOT refresh the MV3 service worker — extension pages load fresh
+> from disk, but the old service worker keeps running, which can leave the
+> panel working while live updates silently use stale code.
+
 ## M0 acceptance checklist
 
 - [ ] `npm run build` produces a loadable unpacked extension in `dist/`.
