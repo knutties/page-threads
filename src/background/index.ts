@@ -20,13 +20,35 @@ function broadcast(msg: SwToPanel): void {
   }
 }
 
+let lastPushedUri: string | null | undefined // undefined = nothing pushed yet
+
+async function pushActiveEntity(): Promise<void> {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true })
+    const entity = tab?.id != null ? tabEntities.get(tab.id) ?? null : null
+    const uri = entity?.entityUri ?? null
+    if (uri !== lastPushedUri) {
+      lastPushedUri = uri
+      broadcast({ type: 'activeEntity', entity })
+    }
+  } catch {
+    // Transient query failure; the next trigger re-evaluates.
+  }
+}
+
+chrome.tabs.onActivated.addListener(() => void pushActiveEntity())
+
 chrome.runtime.onMessage.addListener((msg: ContentToSw, sender) => {
   if (msg.type === 'pageEntity' && sender.tab?.id != null) {
     tabEntities.set(sender.tab.id, { entityUri: msg.entityUri, title: msg.title })
+    if (sender.tab.active) void pushActiveEntity()
   }
 })
 
-chrome.tabs.onRemoved.addListener((tabId) => tabEntities.delete(tabId))
+chrome.tabs.onRemoved.addListener((tabId) => {
+  tabEntities.delete(tabId)
+  void pushActiveEntity()
+})
 
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name !== 'panel') return
