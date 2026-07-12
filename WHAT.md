@@ -1,6 +1,6 @@
 # PageThreads — Spec for a Universal Page-Discussion Browser Extension (Zulip backend)
 
-**Status:** Draft v0.2 (v0.2: §4 rewritten around entity resolution; Appendix A added)
+**Status:** Draft v0.3 (v0.2: §4 rewritten around entity resolution; Appendix A added. v0.3: Appendix B — future knowledge index — added; header message elevated to a versioned contract)
 **Audience:** Implementers
 **One-liner:** A Manifest V3 browser extension that attaches a live discussion thread to any web page, using a Zulip realm as the threading/chat backend, keyed by a resolved **entity URI** (canonical URL in the generic case; tool-aware entity identity for known SaaS tools).
 
@@ -319,3 +319,43 @@ Normalization: owner/repo lowercased (GitHub treats them case-insensitively); is
 | Space overview | `confluence:<host>/space/<spaceKey>` | 1 |
 
 ### A.5 Generic web (`web:`) — §4.4. Always last; never returns `null`.
+
+---
+
+## Appendix B — Future: Searchable / Answerable Knowledge Index (post-M3)
+
+**Intent.** After the current milestones, we want a searchable — and question-answerable — index over the *documents being discussed*, joined with their discussions. This appendix records the architectural constraints that make that possible later, so no current-milestone decision accidentally forecloses it. Nothing here is buildable scope for M0–M3.
+
+### B.1 Architectural position
+
+The index is a **new server-side component, outside both the extension and Zulip**:
+
+- **Zulip remains the system of record for discussions.** The index is *derived data* — always rebuildable by re-reading the channel from message id 0. No index state is authoritative.
+- **The extension is not involved.** It neither reads from nor writes to the index in v1 of this feature. (A later "search from the panel" affordance is UI over the index's query API, not a coupling change.)
+- The indexer itself: content fetcher(s) + embedding/search store + answering layer. Technology choices deliberately unspecified here.
+
+### B.2 The join key already exists — protect it
+
+Everything hinges on the discussion↔document mapping, which the current design already provides:
+
+- Every topic is keyed by `topicKey = hash(entityUri)` (§4.6), and the **header message** in each topic records the full `entityUri`, resolver id@version, and `representativeUrl` in machine-parseable form.
+- Therefore: **the header message format and the entity-URI grammar (§4.2) are public, versioned contracts**, not cosmetic conventions. Changes to either must bump a version (the header already records `resolver@version`; a format change to the header itself must add a recognizable format marker) and must keep old headers parseable. Years of accumulated topics must remain joinable.
+- The indexer's read path is a **stock Zulip bot account** subscribed to the channel, consuming the same REST + events API the extension uses (§5). The event stream doubles as a change-data-capture feed for incremental indexing; backfill is a paginated `GET /messages` walk. Zero extension or Zulip-server changes.
+
+### B.3 The open decision: how document content is acquired
+
+Zulip holds the conversations; the *documents* live behind the entity URIs. Two acquisition models, decision deferred:
+
+| Model | Reach | Cost / risk |
+|---|---|---|
+| **Server-side fetching** — indexer crawls `representativeUrl`s; authenticated connectors (Jira/Drive/Confluence APIs) for SaaS entities | Public web easily; SaaS via per-tool connectors (the same access Tier-3 resolvers would need, §4.3) | Connector auth management; crawler infra; content the team could see but the crawler can't |
+| **Extension-side capture** — extension snapshots readable page text at post time and ships it to the indexer | Exactly what the user saw, incl. auth-walled pages | **Changes the §7 privacy posture** (today only URLs leave the browser, and only on open/post — page *content* is a materially bigger step). Must be explicit opt-in, per-domain controllable, and off by default |
+
+These are combinable (server-side where reachable, capture as fallback). Whichever is chosen, it is an additive component — nothing in M0–M3 needs to change shape for either path.
+
+### B.4 Standing constraints on current milestones
+
+1. Never remove or lossily rewrite header messages; the panel may *render* them specially, but the raw content is the contract.
+2. `entityUri` stays recoverable from every thread (via header) — the topicKey hash alone is deliberately not reversible.
+3. Resolver/granularity changes keep following §4.5 versioning, since the index will use `entityUri` as its document identity too.
+4. Any future decision to ship page content off-browser goes through an explicit spec revision of §7, not a quiet implementation choice.
