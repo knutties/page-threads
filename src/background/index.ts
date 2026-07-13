@@ -1,5 +1,5 @@
-import { config } from '../config'
-import type { ContentToSw, PageEntity, PanelToSw, SwToContent, SwToPanel } from '../shared/messages'
+import { createCredentialsStore, type Credentials } from '../shared/credentials'
+import type { PageEntity, PanelToSw, RuntimeToSw, SwToContent, SwToPanel } from '../shared/messages'
 import { ZulipClient } from '../shared/zulipClient'
 import { EventLoop } from './eventLoop'
 
@@ -7,8 +7,41 @@ chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => 
 
 const tabEntities = new Map<number, PageEntity>()
 const ports = new Set<chrome.runtime.Port>()
-const client = new ZulipClient(config)
+const credentialsStore = createCredentialsStore()
+let credentials: Credentials | null = null
 let loop: EventLoop | null = null
+
+void credentialsStore.load().then((c) => {
+  credentials = c
+  startLoopIfReady()
+})
+
+// Belt-and-braces alongside the credentialsChanged message: a missed message
+// cannot leave a loop running against stale credentials.
+credentialsStore.watch((c) => {
+  credentials = c
+  restartLoop()
+})
+
+function startLoopIfReady(): void {
+  if (loop || !credentials || ports.size === 0) return
+  const client = new ZulipClient(credentials)
+  loop = new EventLoop(client, credentials.channelName, {
+    onEvent: (event) => {
+      if (event.type === 'message' && event.message) {
+        broadcast({ type: 'newMessage', topic: event.message.subject, message: event.message })
+      }
+    },
+    onReconnect: () => broadcast({ type: 'reconnected' }),
+  })
+  void loop.start()
+}
+
+function restartLoop(): void {
+  loop?.stop()
+  loop = null
+  startLoopIfReady()
+}
 
 function broadcast(msg: SwToPanel): void {
   for (const port of ports) {
@@ -58,10 +91,15 @@ async function pushActiveEntity(): Promise<void> {
 
 chrome.tabs.onActivated.addListener(() => void pushActiveEntity())
 
-chrome.runtime.onMessage.addListener((msg: ContentToSw, sender) => {
+chrome.runtime.onMessage.addListener((msg: RuntimeToSw, sender) => {
   if (msg.type === 'pageEntity' && sender.tab?.id != null) {
     tabEntities.set(sender.tab.id, { entityUri: msg.entityUri, title: msg.title })
     if (sender.tab.active) void pushActiveEntity()
+  } else if (msg.type === 'credentialsChanged') {
+    void credentialsStore.load().then((c) => {
+      credentials = c
+      restartLoop()
+    })
   }
 })
 
@@ -74,17 +112,7 @@ chrome.runtime.onConnect.addListener((port) => {
   if (port.name !== 'panel') return
   ports.add(port)
 
-  if (!loop) {
-    loop = new EventLoop(client, config.channelName, {
-      onEvent: (event) => {
-        if (event.type === 'message' && event.message) {
-          broadcast({ type: 'newMessage', topic: event.message.subject, message: event.message })
-        }
-      },
-      onReconnect: () => broadcast({ type: 'reconnected' }),
-    })
-    void loop.start()
-  }
+  startLoopIfReady()
 
   port.onMessage.addListener((msg: PanelToSw) => {
     if (msg.type === 'getActiveEntity') {

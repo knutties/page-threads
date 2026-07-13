@@ -8,6 +8,9 @@ export interface PageEntity {
 /** Content script → service worker, via chrome.runtime.sendMessage. */
 export type ContentToSw = { type: 'pageEntity' } & PageEntity
 
+/** Anything arriving at the service worker via chrome.runtime.sendMessage. */
+export type RuntimeToSw = ContentToSw | { type: 'credentialsChanged' }
+
 /** Service worker → content script, via chrome.tabs.sendMessage. */
 export type SwToContent = { type: 'queryEntity' }
 

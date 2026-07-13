@@ -133,3 +133,72 @@ describe('errors', () => {
     expect(err.message).toBe('HTTP 502')
   })
 })
+
+describe('onboarding endpoints', () => {
+  test('probeServer hits /server_settings without auth and maps fields', async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = []
+    const fn = (async (url: any, init?: RequestInit) => {
+      calls.push({ url: String(url), init })
+      return new Response(
+        JSON.stringify({
+          result: 'success',
+          authentication_methods: { password: true, dev: false },
+          realm_name: 'Acme',
+          zulip_version: '12.1',
+        })
+      )
+    }) as typeof fetch
+    const s = await ZulipClient.probeServer('https://acme.zulipchat.com', fn)
+    expect(s).toEqual({ passwordAuthEnabled: true, realmName: 'Acme', zulipVersion: '12.1' })
+    expect(new URL(calls[0].url).pathname).toBe('/api/v1/server_settings')
+    expect(calls[0].init).toBeUndefined()
+  })
+
+  test('probeServer reports password disabled', async () => {
+    const fn = (async () =>
+      new Response(
+        JSON.stringify({ result: 'success', authentication_methods: { password: false }, realm_name: 'A', zulip_version: 'x' })
+      )) as typeof fetch
+    expect((await ZulipClient.probeServer('https://a.com', fn)).passwordAuthEnabled).toBe(false)
+  })
+
+  test('fetchApiKey posts form-encoded username/password with no auth header', async () => {
+    const calls: Array<{ url: string; init: RequestInit }> = []
+    const fn = (async (url: any, init: RequestInit) => {
+      calls.push({ url: String(url), init })
+      return new Response(JSON.stringify({ result: 'success', api_key: 'sekrit', email: 'me@x.com' }))
+    }) as typeof fetch
+    const key = await ZulipClient.fetchApiKey('https://a.com', 'me@x.com', 'hunter2', fn)
+    expect(key).toBe('sekrit')
+    expect(new URL(calls[0].url).pathname).toBe('/api/v1/fetch_api_key')
+    expect(calls[0].init.method).toBe('POST')
+    const body = calls[0].init.body as URLSearchParams
+    expect(body.get('username')).toBe('me@x.com')
+    expect(body.get('password')).toBe('hunter2')
+    expect((calls[0].init.headers as Record<string, string> | undefined)?.Authorization).toBeUndefined()
+  })
+
+  test('fetchApiKey surfaces Zulip error message', async () => {
+    const fn = (async () =>
+      new Response(JSON.stringify({ result: 'error', msg: 'Your username or password is incorrect', code: 'AUTHENTICATION_FAILED' }), {
+        status: 403,
+      })) as typeof fetch
+    const err = await ZulipClient.fetchApiKey('https://a.com', 'e', 'p', fn).catch((e) => e)
+    expect(err).toBeInstanceOf(ZulipError)
+    expect(err.message).toBe('Your username or password is incorrect')
+  })
+
+  test('getOwnUser maps delivery_email and full_name with basic auth', async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = []
+    const fn = (async (url: any, init?: RequestInit) => {
+      calls.push({ url: String(url), init })
+      return new Response(
+        JSON.stringify({ result: 'success', email: 'bot@x.com', delivery_email: 'me@x.com', full_name: 'Me Myself' })
+      )
+    }) as typeof fetch
+    const me = await new ZulipClient(cfg, fn).getOwnUser()
+    expect(me).toEqual({ email: 'me@x.com', fullName: 'Me Myself' })
+    expect(new URL(calls[0].url).pathname).toBe('/api/v1/users/me')
+    expect((calls[0].init!.headers as Record<string, string>).Authorization).toContain('Basic ')
+  })
+})
