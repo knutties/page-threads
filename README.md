@@ -2,7 +2,8 @@
 
 A Manifest V3 browser extension that attaches a live discussion thread to any web
 page, using a Zulip realm as the backend. Spec: [WHAT.md](WHAT.md). Current state:
-**M1b** (live panel + in-panel onboarding; see docs/superpowers/specs/).
+**M1c** (live panel, in-panel onboarding, rendered messages with edit/delete/
+reactions/read markers; see docs/superpowers/specs/).
 
 ## Build
 
