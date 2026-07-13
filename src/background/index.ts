@@ -1,56 +1,69 @@
-import { createCredentialsStore, type Credentials } from '../shared/credentials'
+import { createCredentialsStore } from '../shared/credentials'
 import type { PageEntity, PanelToSw, RuntimeToSw, SwToContent, SwToPanel } from '../shared/messages'
 import { ZulipClient } from '../shared/zulipClient'
 import { EventLoop } from './eventLoop'
+import { createLifecycle } from './lifecycle'
 
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {})
 
 const tabEntities = new Map<number, PageEntity>()
 const ports = new Set<chrome.runtime.Port>()
 const credentialsStore = createCredentialsStore()
-let credentials: Credentials | null = null
-let loop: EventLoop | null = null
 
-void credentialsStore.load().then((c) => {
-  credentials = c
-  startLoopIfReady()
+const lifecycle = createLifecycle({
+  loadCredentials: () => credentialsStore.load(),
+  makeLoop: (creds) =>
+    new EventLoop(new ZulipClient(creds), creds.channelName, {
+      onEvent: (event) => {
+        if (event.type === 'message' && event.message) {
+          broadcast({ type: 'newMessage', topic: event.message.subject, message: event.message })
+        } else if (event.type === 'update_message' && event.message_id != null && event.rendered_content != null) {
+          broadcast({ type: 'messageUpdated', messageId: event.message_id, renderedContent: event.rendered_content })
+        } else if (event.type === 'delete_message' && event.message_id != null) {
+          broadcast({ type: 'messageDeleted', messageId: event.message_id })
+        } else if (
+          event.type === 'reaction' &&
+          event.message_id != null &&
+          event.op != null &&
+          event.emoji_name != null &&
+          event.emoji_code != null &&
+          event.reaction_type != null &&
+          event.user_id != null
+        ) {
+          broadcast({
+            type: 'reactionChanged',
+            op: event.op,
+            messageId: event.message_id,
+            reaction: {
+              emoji_name: event.emoji_name,
+              emoji_code: event.emoji_code,
+              reaction_type: event.reaction_type,
+              user_id: event.user_id,
+            },
+          })
+        }
+      },
+      onReconnect: () => broadcast({ type: 'reconnected' }),
+    }),
 })
 
-// Belt-and-braces alongside the credentialsChanged message: a missed message
-// cannot leave a loop running against stale credentials.
-credentialsStore.watch((c) => {
-  credentials = c
-  restartLoop()
-})
-
-function startLoopIfReady(): void {
-  if (loop || !credentials || ports.size === 0) return
-  const client = new ZulipClient(credentials)
-  loop = new EventLoop(client, credentials.channelName, {
-    onEvent: (event) => {
-      if (event.type === 'message' && event.message) {
-        broadcast({ type: 'newMessage', topic: event.message.subject, message: event.message })
-      }
-    },
-    onReconnect: () => broadcast({ type: 'reconnected' }),
-  })
-  void loop.start()
-}
-
-function restartLoop(): void {
-  loop?.stop()
-  loop = null
-  startLoopIfReady()
-}
+void lifecycle.init()
+credentialsStore.watch((c) => lifecycle.setCredentials(c))
 
 function broadcast(msg: SwToPanel): void {
   for (const port of ports) {
     try {
       port.postMessage(msg)
     } catch {
-      ports.delete(port) // postMessage throws once the port is gone; drop it
+      removePort(port) // postMessage throws once the port is gone; drop it
     }
   }
+}
+
+function removePort(port: chrome.runtime.Port): void {
+  // Idempotent: only notify the lifecycle when this port was actually still tracked,
+  // so a dead-port cleanup in broadcast() and a later onDisconnect can't double-count.
+  if (ports.delete(port)) lifecycle.portDisconnected()
 }
 
 /** tabEntities is a cache; on a miss (SW restarted since the page loaded), ask the tab. */
@@ -96,10 +109,7 @@ chrome.runtime.onMessage.addListener((msg: RuntimeToSw, sender) => {
     tabEntities.set(sender.tab.id, { entityUri: msg.entityUri, title: msg.title })
     if (sender.tab.active) void pushActiveEntity()
   } else if (msg.type === 'credentialsChanged') {
-    void credentialsStore.load().then((c) => {
-      credentials = c
-      restartLoop()
-    })
+    void lifecycle.reloadCredentials()
   }
 })
 
@@ -108,11 +118,23 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   void pushActiveEntity()
 })
 
+chrome.windows.onFocusChanged.addListener((windowId) => {
+  if (windowId !== chrome.windows.WINDOW_ID_NONE) void pushActiveEntity()
+})
+
+chrome.tabs.onUpdated.addListener((tabId, info) => {
+  // A tab that navigated somewhere content scripts can't run must not keep a stale entity.
+  if (info.status === 'loading' && info.url && !/^https?:/.test(info.url)) {
+    tabEntities.delete(tabId)
+    void pushActiveEntity()
+  }
+})
+
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name !== 'panel') return
   ports.add(port)
 
-  startLoopIfReady()
+  lifecycle.portConnected()
 
   port.onMessage.addListener((msg: PanelToSw) => {
     if (msg.type === 'getActiveEntity') {
@@ -134,10 +156,6 @@ chrome.runtime.onConnect.addListener((port) => {
   })
 
   port.onDisconnect.addListener(() => {
-    ports.delete(port)
-    if (ports.size === 0) {
-      loop?.stop()
-      loop = null
-    }
+    removePort(port)
   })
 })

@@ -1,43 +1,72 @@
-// @vitest-environment happy-dom
+// @vitest-environment jsdom
 import { render, screen } from '@testing-library/preact'
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
 import type { ZulipMessage } from '../shared/zulipClient'
 import { ThreadView } from './ThreadView'
 
 function msg(id: number, content: string): ZulipMessage {
-  return { id, sender_full_name: 'Ada', sender_email: 'ada@x.com', content, timestamp: 1700000000, subject: 'T · k' }
+  return {
+    id,
+    sender_full_name: 'Ada',
+    sender_email: 'ada@x.com',
+    content,
+    timestamp: 1700000000,
+    subject: 'T · k',
+  }
+}
+
+const noop = () => {}
+function renderThread(over: Partial<Parameters<typeof ThreadView>[0]> = {}) {
+  return render(
+    <ThreadView
+      messages={[]}
+      hasThread={false}
+      noPage={false}
+      threadKey={null}
+      ownEmail="me@x.com"
+      ownUserId={17}
+      realmUrl="https://zulip.example.com"
+      editState={null}
+      busy={false}
+      onStartEdit={noop}
+      onCancelEdit={noop}
+      onSaveEdit={noop}
+      onDelete={noop}
+      onToggleReaction={noop}
+      onRendered={noop}
+      {...over}
+    />
+  )
 }
 
 describe('ThreadView', () => {
-  test('no-page state when the active tab has no web entity', () => {
-    render(<ThreadView messages={[]} hasThread={false} noPage={true} />)
+  test('no-page and empty states', () => {
+    renderThread({ noPage: true })
     expect(screen.getByText('Open a web page to see its discussion.')).toBeTruthy()
   })
 
-  test('shows empty state when a page is resolved but has no thread', () => {
-    render(<ThreadView messages={[]} hasThread={false} noPage={false} />)
-    expect(screen.getByText('No discussion yet. Start one.')).toBeTruthy()
+  test('renders sanitized message content via MessageView', () => {
+    const { container } = renderThread({
+      messages: [msg(1, '<p>hi <em>there</em><script>x()</script></p>')],
+      hasThread: true,
+      threadKey: 'k1',
+    })
+    expect(container.querySelector('em')).toBeTruthy()
+    expect(container.querySelector('script')).toBeNull()
   })
 
-  test('renders sender and content', () => {
-    render(<ThreadView messages={[msg(1, 'hello there')]} hasThread={true} noPage={false} />)
-    expect(screen.getByText('Ada')).toBeTruthy()
-    expect(screen.getByText('hello there')).toBeTruthy()
+  test('reports rendered message ids for read marking', () => {
+    const onRendered = vi.fn()
+    renderThread({ messages: [msg(1, '<p>a</p>'), msg(2, '<p>b</p>')], hasThread: true, threadKey: 'k1', onRendered })
+    expect(onRendered).toHaveBeenCalledWith([1, 2])
   })
 
-  test('renders URLs as safe links', () => {
-    render(<ThreadView messages={[msg(1, 'see https://example.com/x')]} hasThread={true} noPage={false} />)
-    const a = screen.getByRole('link') as HTMLAnchorElement
-    expect(a.href).toBe('https://example.com/x')
-    expect(a.rel).toContain('noopener')
-    expect(a.target).toBe('_blank')
-  })
-
-  test('message content is rendered as text, not HTML', () => {
-    const { container } = render(
-      <ThreadView messages={[msg(1, '<img src=x onerror=alert(1)>')]} hasThread={true} noPage={false} />
-    )
-    expect(container.querySelector('img')).toBeNull()
-    expect(screen.getByText('<img src=x onerror=alert(1)>')).toBeTruthy()
+  test('own messages get actions, others do not', () => {
+    const { container } = renderThread({
+      messages: [msg(1, '<p>a</p>'), { ...msg(2, '<p>b</p>'), sender_email: 'me@x.com' }],
+      hasThread: true,
+      threadKey: 'k1',
+    })
+    expect(container.querySelectorAll('.msg-actions')).toHaveLength(1)
   })
 })

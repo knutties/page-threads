@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "PageThreads",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Zulip-backed discussion threads for any web page",
   "action": { "default_title": "PageThreads" },
   "side_panel": { "default_path": "src/panel/index.html" },

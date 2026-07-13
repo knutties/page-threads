@@ -11,15 +11,30 @@ export interface ZulipMessage {
   content: string
   timestamp: number
   subject: string // Zulip's field name for the topic
+  reactions?: ZulipReaction[]
+}
+
+export interface ZulipReaction {
+  emoji_name: string
+  emoji_code: string
+  reaction_type: string
+  user_id: number
 }
 
 export interface ZulipEvent {
   id: number
   type: string
   message?: ZulipMessage
+  message_id?: number
+  rendered_content?: string
+  op?: 'add' | 'remove'
+  emoji_name?: string
+  emoji_code?: string
+  reaction_type?: string
+  user_id?: number
 }
 
-interface ZulipSuccess {
+export interface ZulipSuccess {
   result: 'success'
   msg: string
 }
@@ -38,6 +53,10 @@ export interface GetMessagesResponse extends ZulipSuccess {
 
 export interface SendMessageResponse extends ZulipSuccess {
   id: number
+}
+
+export interface GetSingleMessageResponse extends ZulipSuccess {
+  message: { content: string }
 }
 
 export interface RegisterResponse extends ZulipSuccess {
@@ -61,6 +80,7 @@ export interface GetOwnUserResponse {
   email: string
   delivery_email?: string
   full_name: string
+  user_id: number
 }
 
 export class ZulipError extends Error {
@@ -95,7 +115,7 @@ export class ZulipClient {
   }
 
   private async request<T>(
-    method: 'GET' | 'POST',
+    method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
     path: string,
     params?: Record<string, unknown>
   ): Promise<T> {
@@ -134,7 +154,7 @@ export class ZulipClient {
       anchor: 'newest',
       num_before: 50,
       num_after: 0,
-      apply_markdown: false,
+      apply_markdown: true,
       narrow: [
         { operator: 'channel', operand: channel },
         { operator: 'topic', operand: topic },
@@ -155,8 +175,9 @@ export class ZulipClient {
 
   async register(channel: string): Promise<{ queueId: string; lastEventId: number }> {
     const data = await this.request<RegisterResponse>('POST', '/register', {
-      event_types: ['message'],
+      event_types: ['message', 'update_message', 'delete_message', 'reaction'],
       narrow: [['channel', channel]],
+      apply_markdown: true,
     })
     return { queueId: data.queue_id, lastEventId: data.last_event_id }
   }
@@ -191,8 +212,35 @@ export class ZulipClient {
     return data.api_key
   }
 
-  async getOwnUser(): Promise<{ email: string; fullName: string }> {
+  async getOwnUser(): Promise<{ email: string; fullName: string; userId: number }> {
     const data = await this.request<GetOwnUserResponse>('GET', '/users/me')
-    return { email: data.delivery_email ?? data.email, fullName: data.full_name }
+    return { email: data.delivery_email ?? data.email, fullName: data.full_name, userId: data.user_id }
+  }
+
+  async getRawMessage(id: number): Promise<string> {
+    const data = await this.request<GetSingleMessageResponse>('GET', `/messages/${id}`, {
+      apply_markdown: false,
+    })
+    return data.message.content
+  }
+
+  async updateMessage(id: number, content: string): Promise<void> {
+    await this.request<ZulipSuccess>('PATCH', `/messages/${id}`, { content })
+  }
+
+  async deleteMessage(id: number): Promise<void> {
+    await this.request<ZulipSuccess>('DELETE', `/messages/${id}`)
+  }
+
+  async addReaction(id: number, emojiName: string): Promise<void> {
+    await this.request<ZulipSuccess>('POST', `/messages/${id}/reactions`, { emoji_name: emojiName })
+  }
+
+  async removeReaction(id: number, emojiName: string): Promise<void> {
+    await this.request<ZulipSuccess>('DELETE', `/messages/${id}/reactions`, { emoji_name: emojiName })
+  }
+
+  async markRead(ids: number[]): Promise<void> {
+    await this.request<ZulipSuccess>('POST', '/messages/flags', { messages: ids, op: 'add', flag: 'read' })
   }
 }

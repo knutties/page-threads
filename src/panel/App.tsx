@@ -8,7 +8,9 @@ import { AccountView } from './AccountView'
 import { Composer } from './Composer'
 import { Drafts } from './drafts'
 import { topicMatchesKey } from './eventMatch'
+import type { ReactionInput } from './MessageView'
 import { panelTarget, type PanelTargetState } from './panelTarget'
+import { createReadMarker, type ReadMarker } from './readMarker'
 import { SetupView } from './SetupView'
 import { ThreadView } from './ThreadView'
 import { threadReducer } from './threadState'
@@ -20,7 +22,6 @@ const credentialsStore = createCredentialsStore()
 interface Thread {
   entity: PageEntity
   key: string
-  /** Exact topic name on the server, or null when no discussion exists yet. */
   existingTopic: string | null
 }
 
@@ -40,9 +41,9 @@ function notifySwCredentialsChanged(): void {
 }
 
 export function App() {
-  // undefined = still loading from storage; null = not configured (show setup)
   const [credentials, setCredentials] = useState<Credentials | null | undefined>(undefined)
   const [fullName, setFullName] = useState<string | undefined>(undefined)
+  const [ownUserId, setOwnUserId] = useState<number | null>(null)
   const [showAccount, setShowAccount] = useState(false)
   const [thread, setThread] = useState<Thread | null>(null)
   const [messages, dispatch] = useReducer(threadReducer, [])
@@ -50,6 +51,8 @@ export function App() {
   const [pinned, setPinned] = useState(false)
   const [draftText, setDraftText] = useState('')
   const [sending, setSending] = useState(false)
+  const [editState, setEditState] = useState<{ id: number; raw: string } | null>(null)
+  const [actionBusy, setActionBusy] = useState(false)
 
   const threadRef = useRef<Thread | null>(null)
   threadRef.current = thread
@@ -58,15 +61,55 @@ export function App() {
   const portRef = useRef<chrome.runtime.Port | null>(null)
   const clientRef = useRef<ZulipClient | null>(null)
   const credsRef = useRef<Credentials | null>(null)
+  const sendingRef = useRef(false) // synchronous double-send latch (backlog #3)
+  const initGenRef = useRef(0) // per-init generation token (backlog #7)
+  const readMarkerRef = useRef<ReadMarker | null>(null)
 
   function applyCredentials(c: Credentials | null) {
     credsRef.current = c
     clientRef.current = c ? new ZulipClient(c) : null
+    readMarkerRef.current?.dispose()
+    readMarkerRef.current = c
+      ? createReadMarker({
+          flush: (ids) => clientRef.current?.markRead(ids) ?? Promise.resolve(),
+          isVisible: () => document.visibilityState === 'visible',
+        })
+      : null
     setCredentials(c)
+    if (c && clientRef.current) {
+      const client = clientRef.current
+      client
+        .getOwnUser()
+        .then((u) => {
+          if (clientRef.current === client) {
+            setFullName(u.fullName)
+            setOwnUserId(u.userId)
+          }
+        })
+        .catch(() => {})
+    } else {
+      setFullName(undefined)
+      setOwnUserId(null)
+    }
+  }
+
+  function resetThreadState() {
+    targetRef.current = { pinned: false, currentUri: null }
+    setThread(null)
+    dispatch({ type: 'history', messages: [] })
+    setDraftText('')
+    setPinned(false)
+    setError(null)
+    setEditState(null)
   }
 
   useEffect(() => {
     void credentialsStore.load().then(applyCredentials)
+    // Backlog #1: a sign-out or account switch in ANY window updates this panel too.
+    return credentialsStore.watch((c) => {
+      resetThreadState()
+      applyCredentials(c)
+    })
   }, [])
 
   useEffect(() => {
@@ -76,20 +119,17 @@ export function App() {
 
   async function completeSetup(c: Credentials) {
     await credentialsStore.save(c)
+    // The credentialsStore.watch above fires for this same save and applies it;
+    // apply directly too so the transition is immediate even if events lag.
+    resetThreadState()
     applyCredentials(c)
     notifySwCredentialsChanged()
   }
 
   async function signOut() {
     await credentialsStore.clear()
-    targetRef.current = { pinned: false, currentUri: null }
-    setThread(null)
-    dispatch({ type: 'history', messages: [] })
-    setDraftText('')
-    setPinned(false)
-    setError(null)
+    resetThreadState()
     setShowAccount(false)
-    setFullName(undefined)
     applyCredentials(null)
     notifySwCredentialsChanged()
   }
@@ -112,11 +152,15 @@ export function App() {
     )
     targetRef.current = state
     if (action === 'switch' && entity) {
+      const generation = ++initGenRef.current
       setError(null)
       setThread(null)
+      setEditState(null)
       dispatch({ type: 'history', messages: [] })
       setDraftText(drafts.get(entity.entityUri))
       initThread(entity).catch((e) => {
+        // Backlog #7: only the LATEST init may surface failure / re-arm the reducer.
+        if (generation !== initGenRef.current) return
         setError(errText(e))
         targetRef.current = panelTarget(
           targetRef.current,
@@ -126,6 +170,7 @@ export function App() {
       })
     } else if (action === 'clear') {
       setThread(null)
+      setEditState(null)
       dispatch({ type: 'history', messages: [] })
       setDraftText('')
     }
@@ -146,6 +191,13 @@ export function App() {
           if (!t.existingTopic) setThread({ ...t, existingTopic: msg.topic })
           dispatch({ type: 'append', message: msg.message })
         }
+      } else if (msg.type === 'messageUpdated') {
+        dispatch({ type: 'update', id: msg.messageId, content: msg.renderedContent })
+      } else if (msg.type === 'messageDeleted') {
+        dispatch({ type: 'remove', id: msg.messageId })
+        setEditState((cur) => (cur?.id === msg.messageId ? null : cur))
+      } else if (msg.type === 'reactionChanged') {
+        dispatch({ type: 'reaction', op: msg.op, id: msg.messageId, reaction: msg.reaction })
       } else if (msg.type === 'reconnected') {
         const t = threadRef.current
         if (t?.existingTopic) loadHistory(t.existingTopic, t.entity.entityUri).catch(() => {})
@@ -156,8 +208,6 @@ export function App() {
       port = chrome.runtime.connect({ name: 'panel' })
       portRef.current = port
       port.onMessage.addListener(handleMessage)
-      // Port messages are what reset the MV3 service-worker idle timer; the
-      // long-poll fetch alone does not keep it alive. 20s < the 30s idle limit.
       pingTimer = window.setInterval(() => {
         try {
           port.postMessage({ type: 'ping' } satisfies PanelToSw)
@@ -168,7 +218,6 @@ export function App() {
       port.onDisconnect.addListener(() => {
         window.clearInterval(pingTimer)
         if (disposed) return
-        // SW was torn down; reconnecting wakes it and restarts the event loop.
         window.setTimeout(() => {
           if (!disposed) connect(true)
         }, 200)
@@ -177,8 +226,6 @@ export function App() {
       if (!isReconnect || !t) {
         port.postMessage({ type: 'getActiveEntity' } satisfies PanelToSw)
       } else if (t.existingTopic) {
-        // Already resolved: skip re-init (SW tab map may be empty after restart),
-        // just catch up on anything missed while the port was down.
         loadHistory(t.existingTopic, t.entity.entityUri).catch(() => {})
       }
     }
@@ -200,7 +247,6 @@ export function App() {
     const streamId = await client.getStreamId(creds.channelName)
     const topics = await client.getTopics(streamId)
     const existingTopic = matchTopicByKey(topics, key)
-    // A later push may have switched targets while we awaited; don't clobber it.
     if (targetRef.current.currentUri !== entity.entityUri) return
     setThread({ entity, key, existingTopic })
     if (existingTopic) await loadHistory(existingTopic, entity.entityUri)
@@ -210,10 +256,9 @@ export function App() {
     const client = clientRef.current
     const creds = credsRef.current
     if (!client || !creds) return
-    const messages = await client.getMessages(creds.channelName, topic)
-    // The user may have switched targets while the fetch was in flight.
+    const fetched = await client.getMessages(creds.channelName, topic)
     if (targetRef.current.currentUri !== forUri) return
-    dispatch({ type: 'history', messages })
+    dispatch({ type: 'history', messages: fetched })
   }
 
   async function send(text: string) {
@@ -221,15 +266,14 @@ export function App() {
     const client = clientRef.current
     const creds = credsRef.current
     if (!t || !client || !creds) return
-    if (sending) return
+    if (sendingRef.current) return // backlog #3: synchronous latch
+    sendingRef.current = true
     setSending(true)
     setError(null)
     try {
       let topic = t.existingTopic
       if (!topic) {
         topic = topicName(t.entity.title, t.key)
-        // Header first (spec §6.2); on failure retry once, then proceed regardless —
-        // the topicKey suffix still makes the thread resolvable.
         try {
           await client.sendMessage(creds.channelName, topic, headerMessage(t.entity, creds.email))
         } catch {
@@ -244,7 +288,71 @@ export function App() {
     } catch (e) {
       setError(errText(e))
     } finally {
+      sendingRef.current = false
       setSending(false)
+    }
+  }
+
+  async function startEdit(id: number) {
+    const client = clientRef.current
+    if (!client) return
+    setActionBusy(true)
+    try {
+      const raw = await client.getRawMessage(id)
+      if (clientRef.current !== client) return
+      setEditState({ id, raw })
+    } catch (e) {
+      if (clientRef.current !== client) return
+      setError(errText(e))
+    } finally {
+      if (clientRef.current === client) setActionBusy(false)
+    }
+  }
+
+  async function saveEdit(id: number, content: string) {
+    const client = clientRef.current
+    if (!client) return
+    setActionBusy(true)
+    try {
+      await client.updateMessage(id, content)
+      if (clientRef.current !== client) return
+      setEditState(null) // rendered update arrives via the update_message event
+    } catch (e) {
+      if (clientRef.current !== client) return
+      setError(errText(e))
+    } finally {
+      if (clientRef.current === client) setActionBusy(false)
+    }
+  }
+
+  async function deleteMessage(id: number) {
+    const client = clientRef.current
+    if (!client) return
+    setActionBusy(true)
+    try {
+      await client.deleteMessage(id)
+    } catch (e) {
+      if (clientRef.current !== client) return
+      setError(errText(e))
+    } finally {
+      if (clientRef.current === client) setActionBusy(false)
+    }
+  }
+
+  async function toggleReaction(id: number, r: ReactionInput) {
+    const client = clientRef.current
+    if (!client || ownUserId === null) return
+    const message = messages.find((m) => m.id === id)
+    const mine = message?.reactions?.some(
+      (x) => x.emoji_code === r.emoji_code && x.reaction_type === r.reaction_type && x.user_id === ownUserId
+    )
+    try {
+      if (mine) await client.removeReaction(id, r.emoji_name)
+      else await client.addReaction(id, r.emoji_name)
+      // State updates arrive via the reaction event.
+    } catch (e) {
+      if (clientRef.current !== client) return
+      setError(errText(e))
     }
   }
 
@@ -254,20 +362,6 @@ export function App() {
     targetRef.current = state
     setPinned(state.pinned)
     if (action === 'refresh') requestActiveEntity()
-  }
-
-  function openAccount() {
-    setShowAccount(true)
-    const client = clientRef.current
-    if (!fullName && client) {
-      client
-        .getOwnUser()
-        .then((u) => {
-          // The account may have changed while the fetch was in flight.
-          if (clientRef.current === client) setFullName(u.fullName)
-        })
-        .catch(() => {})
-    }
   }
 
   if (credentials === undefined) {
@@ -298,7 +392,7 @@ export function App() {
         >
           📌
         </button>
-        <button class="pin" title="Account" onClick={openAccount}>
+        <button class="pin" title="Account" onClick={() => setShowAccount(true)}>
           ⚙️
         </button>
       </header>
@@ -314,8 +408,30 @@ export function App() {
           )}
         </div>
       )}
-      <ThreadView messages={messages} hasThread={!!thread?.existingTopic} noPage={!thread && !error} />
-      <Composer value={draftText} onInput={onDraftInput} onSend={(text) => void send(text)} disabled={!thread} busy={sending} />
+      <ThreadView
+        messages={messages}
+        hasThread={!!thread?.existingTopic}
+        noPage={!thread && !error}
+        threadKey={thread?.key ?? null}
+        ownEmail={credentials.email}
+        ownUserId={ownUserId}
+        realmUrl={credentials.realmUrl}
+        editState={editState}
+        busy={actionBusy}
+        onStartEdit={(id) => void startEdit(id)}
+        onCancelEdit={() => setEditState(null)}
+        onSaveEdit={(id, content) => void saveEdit(id, content)}
+        onDelete={(id) => void deleteMessage(id)}
+        onToggleReaction={(id, r) => void toggleReaction(id, r)}
+        onRendered={(ids) => readMarkerRef.current?.noteRendered(ids)}
+      />
+      <Composer
+        value={draftText}
+        onInput={onDraftInput}
+        onSend={(text) => void send(text)}
+        disabled={!thread}
+        busy={sending}
+      />
     </div>
   )
 }

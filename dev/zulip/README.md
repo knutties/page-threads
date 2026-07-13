@@ -12,6 +12,10 @@ Zulip web app and the extension's API calls work.
 > Note: the extension uses the `channel` narrow operator, which requires
 > Zulip Server ≥ 9.0. docker-zulip's default image satisfies this.
 
+> LDAP-backed realms report password auth as unavailable in the extension's
+> probe even though a password-style form exists; sign in with the API-key
+> flow (or `fetch_api_key`, which also works against LDAP backends).
+
 ## First-time setup
 
 Clone upstream into this directory (the clone is gitignored):
