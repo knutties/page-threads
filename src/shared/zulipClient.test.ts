@@ -56,7 +56,7 @@ describe('auth and encoding', () => {
     expect(url.pathname).toBe('/api/v1/messages')
     expect(url.searchParams.get('anchor')).toBe('newest')
     expect(url.searchParams.get('num_before')).toBe('50')
-    expect(url.searchParams.get('apply_markdown')).toBe('false')
+    expect(url.searchParams.get('apply_markdown')).toBe('true')
     expect(JSON.parse(url.searchParams.get('narrow')!)).toEqual([
       { operator: 'channel', operand: 'web-threads' },
       { operator: 'topic', operand: 'T · k' },
@@ -99,7 +99,7 @@ describe('endpoints', () => {
     const q = await new ZulipClient(cfg, fn).register('web-threads')
     expect(q).toEqual({ queueId: 'q9', lastEventId: -1 })
     const body = calls[0].init!.body as URLSearchParams
-    expect(JSON.parse(body.get('event_types')!)).toEqual(['message'])
+    expect(JSON.parse(body.get('event_types')!)).toEqual(['message', 'update_message', 'delete_message', 'reaction'])
     expect(JSON.parse(body.get('narrow')!)).toEqual([['channel', 'web-threads']])
   })
 
@@ -200,5 +200,77 @@ describe('onboarding endpoints', () => {
     expect(me).toEqual({ email: 'me@x.com', fullName: 'Me Myself' })
     expect(new URL(calls[0].url).pathname).toBe('/api/v1/users/me')
     expect((calls[0].init!.headers as Record<string, string>).Authorization).toContain('Basic ')
+  })
+})
+
+describe('message features endpoints', () => {
+  function capture(payload: unknown) {
+    const calls: Array<{ url: string; init?: RequestInit }> = []
+    const fn = (async (url: any, init?: RequestInit) => {
+      calls.push({ url: String(url), init })
+      return new Response(JSON.stringify(payload))
+    }) as typeof fetch
+    return { fn, calls }
+  }
+
+  test('getRawMessage fetches a single message unrendered', async () => {
+    const { fn, calls } = capture({ result: 'success', message: { content: '**raw**' } })
+    expect(await new ZulipClient(cfg, fn).getRawMessage(42)).toBe('**raw**')
+    const url = new URL(calls[0].url)
+    expect(url.pathname).toBe('/api/v1/messages/42')
+    expect(url.searchParams.get('apply_markdown')).toBe('false')
+  })
+
+  test('updateMessage PATCHes content', async () => {
+    const { fn, calls } = capture({ result: 'success' })
+    await new ZulipClient(cfg, fn).updateMessage(42, 'new text')
+    expect(calls[0].init!.method).toBe('PATCH')
+    expect(new URL(calls[0].url).pathname).toBe('/api/v1/messages/42')
+    expect((calls[0].init!.body as URLSearchParams).get('content')).toBe('new text')
+  })
+
+  test('deleteMessage DELETEs', async () => {
+    const { fn, calls } = capture({ result: 'success' })
+    await new ZulipClient(cfg, fn).deleteMessage(42)
+    expect(calls[0].init!.method).toBe('DELETE')
+    expect(new URL(calls[0].url).pathname).toBe('/api/v1/messages/42')
+  })
+
+  test('addReaction / removeReaction hit the reactions resource', async () => {
+    const { fn, calls } = capture({ result: 'success' })
+    const client = new ZulipClient(cfg, fn)
+    await client.addReaction(42, 'thumbs_up')
+    await client.removeReaction(42, 'thumbs_up')
+    expect(calls[0].init!.method).toBe('POST')
+    expect(new URL(calls[0].url).pathname).toBe('/api/v1/messages/42/reactions')
+    expect((calls[0].init!.body as URLSearchParams).get('emoji_name')).toBe('thumbs_up')
+    expect(calls[1].init!.method).toBe('DELETE')
+    expect((calls[1].init!.body as URLSearchParams).get('emoji_name')).toBe('thumbs_up')
+  })
+
+  test('markRead posts message ids with the read flag', async () => {
+    const { fn, calls } = capture({ result: 'success', messages: [1, 2] })
+    await new ZulipClient(cfg, fn).markRead([1, 2])
+    expect(calls[0].init!.method).toBe('POST')
+    expect(new URL(calls[0].url).pathname).toBe('/api/v1/messages/flags')
+    const body = calls[0].init!.body as URLSearchParams
+    expect(JSON.parse(body.get('messages')!)).toEqual([1, 2])
+    expect(body.get('op')).toBe('add')
+    expect(body.get('flag')).toBe('read')
+  })
+
+  test('getOwnUser includes userId', async () => {
+    const { fn } = capture({
+      result: 'success',
+      email: 'e',
+      delivery_email: 'me@x.com',
+      full_name: 'Me',
+      user_id: 17,
+    })
+    expect(await new ZulipClient(cfg, fn).getOwnUser()).toEqual({
+      email: 'me@x.com',
+      fullName: 'Me',
+      userId: 17,
+    })
   })
 })
