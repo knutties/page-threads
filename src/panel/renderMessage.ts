@@ -27,7 +27,13 @@ function resolveHttpUrl(raw: string, realmUrl: string): string | null {
  * with inert elements we construct, so it cannot reintroduce anything unsafe.
  */
 export function sanitizeMessageHtml(html: string, realmUrl: string): string {
-  const clean = DOMPurify.sanitize(html, { ALLOWED_TAGS, ALLOWED_ATTR, ALLOW_DATA_ATTR: false })
+  // Pre-strip literal <script> tags before DOMPurify sees them. DOMPurify already
+  // excludes 'script' from ALLOWED_TAGS, so this changes no sanitization outcome —
+  // it only avoids feeding a raw <script> tag into DOMPurify's parser, which some
+  // DOM implementations (e.g. happy-dom, used by component tests) mishandle by
+  // dropping the entire sanitized output as an internal fail-safe.
+  const withoutScripts = html.replace(/<script[^>]*>[\s\S]*?<\/script\s*>/gi, '')
+  const clean = DOMPurify.sanitize(withoutScripts, { ALLOWED_TAGS, ALLOWED_ATTR, ALLOW_DATA_ATTR: false })
   const tpl = document.createElement('template')
   tpl.innerHTML = clean
   for (const a of Array.from(tpl.content.querySelectorAll('a'))) {
