@@ -1,4 +1,4 @@
-import type { ZulipMessage } from './zulipClient'
+import type { ZulipMessage, ZulipReaction } from './zulipClient'
 
 export interface PageEntity {
   entityUri: string
@@ -22,3 +22,6 @@ export type SwToPanel =
   | { type: 'activeEntity'; entity: PageEntity | null }
   | { type: 'newMessage'; topic: string; message: ZulipMessage }
   | { type: 'reconnected' }
+  | { type: 'messageUpdated'; messageId: number; renderedContent: string }
+  | { type: 'messageDeleted'; messageId: number }
+  | { type: 'reactionChanged'; op: 'add' | 'remove'; messageId: number; reaction: ZulipReaction }
