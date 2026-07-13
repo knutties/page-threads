@@ -177,6 +177,7 @@ export class ZulipClient {
     const data = await this.request<RegisterResponse>('POST', '/register', {
       event_types: ['message', 'update_message', 'delete_message', 'reaction'],
       narrow: [['channel', channel]],
+      apply_markdown: true,
     })
     return { queueId: data.queue_id, lastEventId: data.last_event_id }
   }

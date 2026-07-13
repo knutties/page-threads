@@ -101,6 +101,7 @@ describe('endpoints', () => {
     const body = calls[0].init!.body as URLSearchParams
     expect(JSON.parse(body.get('event_types')!)).toEqual(['message', 'update_message', 'delete_message', 'reaction'])
     expect(JSON.parse(body.get('narrow')!)).toEqual([['channel', 'web-threads']])
+    expect(body.get('apply_markdown')).toBe('true')
   })
 
   test('getEvents returns events array', async () => {
