@@ -253,10 +253,14 @@ export function App() {
 
   function openAccount() {
     setShowAccount(true)
-    if (!fullName && clientRef.current) {
-      clientRef.current
+    const client = clientRef.current
+    if (!fullName && client) {
+      client
         .getOwnUser()
-        .then((u) => setFullName(u.fullName))
+        .then((u) => {
+          // The account may have changed while the fetch was in flight.
+          if (clientRef.current === client) setFullName(u.fullName)
+        })
         .catch(() => {})
     }
   }
