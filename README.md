@@ -79,3 +79,17 @@ are stored in extension storage; use the ⚙️ menu to sign out.
 - [ ] ⚙️ → Sign out returns to setup; signing in as a different user gets live updates for that account (post from the Zulip web UI to verify).
 - [ ] Credentials survive a full browser restart.
 - [ ] Second profile (`dev/run-chrome.sh user2`) onboards as the second user with the SAME dist/ build — dist-user2 is gone.
+
+## M1c acceptance checklist
+
+- [ ] A message using Zulip markdown (bold, code block, quote, @-mention, emoji, link, image) renders faithfully; the image shows a "Load image" placeholder until clicked.
+- [ ] Edit your own message → the change appears live in a second user's panel; delete → it disappears live.
+- [ ] Actions (✎/🗑) appear only on your own messages.
+- [ ] React via + and by clicking an existing chip; both directions appear live for the other user; your own reactions are highlighted.
+- [ ] After viewing a thread in the panel, its unread count drops in the Zulip web app.
+- [ ] Sign out in one browser window → a second window of the same profile drops to setup by itself.
+- [ ] Rapid A→B→A tab switching produces no spurious error bar.
+- [ ] Switching focus between two browser windows retargets the panel.
+- [ ] Navigating a tab to chrome://settings while its thread is shown: panel holds (default) without stale re-pushes later.
+- [ ] Reactions from another user appear live (verifies reaction events carry all expected fields).
+- [ ] Deleting a message from the Zulip web UI removes it live in the panel (verifies delete_message event shape on this Zulip version).

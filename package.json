@@ -1,7 +1,7 @@
 {
   "name": "page-threads",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "scripts": {
     "build": "tsc --noEmit && vite build && vite build -c vite.content.config.ts",
