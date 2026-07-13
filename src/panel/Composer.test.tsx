@@ -16,6 +16,7 @@ function Harness({ onSend }: { onSend: (t: string) => void }) {
         setValue('')
       }}
       disabled={false}
+      busy={false}
     />
   )
 }
@@ -59,7 +60,22 @@ describe('Composer', () => {
   })
 
   test('disabled state disables the controls', () => {
-    render(<Composer value="" onInput={() => {}} onSend={() => {}} disabled={true} />)
+    render(<Composer value="" onInput={() => {}} onSend={() => {}} disabled={true} busy={false} />)
     expect((screen.getByPlaceholderText('Write a message…') as HTMLTextAreaElement).disabled).toBe(true)
+  })
+
+  test('busy blocks Enter and submit but keeps the textarea editable', () => {
+    const onSend = vi.fn()
+    render(<Composer value="hello" onInput={() => {}} onSend={onSend} disabled={false} busy={true} />)
+    const box = screen.getByPlaceholderText('Write a message…') as HTMLTextAreaElement
+    fireEvent.keyDown(box, { key: 'Enter' })
+    fireEvent.submit(box.closest('form')!)
+    expect(onSend).not.toHaveBeenCalled()
+    expect(box.disabled).toBe(false)
+  })
+
+  test('send button is disabled while busy', () => {
+    render(<Composer value="hello" onInput={() => {}} onSend={() => {}} disabled={false} busy={true} />)
+    expect((screen.getByText('Send') as HTMLButtonElement).disabled).toBe(true)
   })
 })

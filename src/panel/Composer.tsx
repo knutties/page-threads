@@ -3,14 +3,17 @@ export function Composer({
   onInput,
   onSend,
   disabled,
+  busy,
 }: {
   value: string
   onInput: (text: string) => void
   onSend: (text: string) => void
   disabled: boolean
+  busy: boolean
 }) {
   function submit(e: Event) {
     e.preventDefault()
+    if (busy) return // a send is already in flight; block duplicates
     const t = value.trim()
     if (!t) return
     onSend(t)
@@ -28,7 +31,7 @@ export function Composer({
         placeholder="Write a message…"
         disabled={disabled}
       />
-      <button type="submit" disabled={disabled || !value.trim()}>
+      <button type="submit" disabled={disabled || busy || !value.trim()}>
         Send
       </button>
     </form>

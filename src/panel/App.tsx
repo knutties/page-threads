@@ -49,6 +49,7 @@ export function App() {
   const [error, setError] = useState<string | null>(null)
   const [pinned, setPinned] = useState(false)
   const [draftText, setDraftText] = useState('')
+  const [sending, setSending] = useState(false)
 
   const threadRef = useRef<Thread | null>(null)
   threadRef.current = thread
@@ -220,6 +221,8 @@ export function App() {
     const client = clientRef.current
     const creds = credsRef.current
     if (!t || !client || !creds) return
+    if (sending) return
+    setSending(true)
     setError(null)
     try {
       let topic = t.existingTopic
@@ -240,6 +243,8 @@ export function App() {
       await loadHistory(topic, t.entity.entityUri)
     } catch (e) {
       setError(errText(e))
+    } finally {
+      setSending(false)
     }
   }
 
@@ -310,7 +315,7 @@ export function App() {
         </div>
       )}
       <ThreadView messages={messages} hasThread={!!thread?.existingTopic} noPage={!thread && !error} />
-      <Composer value={draftText} onInput={onDraftInput} onSend={(text) => void send(text)} disabled={!thread} />
+      <Composer value={draftText} onInput={onDraftInput} onSend={(text) => void send(text)} disabled={!thread} busy={sending} />
     </div>
   )
 }
