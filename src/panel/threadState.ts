@@ -24,6 +24,7 @@ export function threadReducer(messages: ZulipMessage[], action: ThreadAction): Z
       if (!messages.some((m) => m.id === action.id)) return messages
       return messages.filter((m) => m.id !== action.id)
     case 'reaction':
+      if (!messages.some((m) => m.id === action.id)) return messages
       return messages.map((m) => {
         if (m.id !== action.id) return m
         const current = m.reactions ?? []

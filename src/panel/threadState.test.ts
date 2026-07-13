@@ -49,4 +49,10 @@ describe('threadReducer', () => {
     expect(removed[0].reactions).toEqual([{ ...r, user_id: 8 }])
     expect(threadReducer(state, { type: 'reaction', op: 'remove', id: 1, reaction: r })[0].reactions ?? []).toEqual([])
   })
+
+  test('reaction for an unknown message id returns the same state reference', () => {
+    const r = { emoji_name: '+1', emoji_code: '1f44d', reaction_type: 'unicode_emoji', user_id: 7 }
+    const state = [msg(1)]
+    expect(threadReducer(state, { type: 'reaction', op: 'add', id: 99, reaction: r })).toBe(state)
+  })
 })
