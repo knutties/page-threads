@@ -195,6 +195,7 @@ export function App() {
         dispatch({ type: 'update', id: msg.messageId, content: msg.renderedContent })
       } else if (msg.type === 'messageDeleted') {
         dispatch({ type: 'remove', id: msg.messageId })
+        setEditState((cur) => (cur?.id === msg.messageId ? null : cur))
       } else if (msg.type === 'reactionChanged') {
         dispatch({ type: 'reaction', op: msg.op, id: msg.messageId, reaction: msg.reaction })
       } else if (msg.type === 'reconnected') {
@@ -298,11 +299,13 @@ export function App() {
     setActionBusy(true)
     try {
       const raw = await client.getRawMessage(id)
+      if (clientRef.current !== client) return
       setEditState({ id, raw })
     } catch (e) {
+      if (clientRef.current !== client) return
       setError(errText(e))
     } finally {
-      setActionBusy(false)
+      if (clientRef.current === client) setActionBusy(false)
     }
   }
 
@@ -312,11 +315,13 @@ export function App() {
     setActionBusy(true)
     try {
       await client.updateMessage(id, content)
+      if (clientRef.current !== client) return
       setEditState(null) // rendered update arrives via the update_message event
     } catch (e) {
+      if (clientRef.current !== client) return
       setError(errText(e))
     } finally {
-      setActionBusy(false)
+      if (clientRef.current === client) setActionBusy(false)
     }
   }
 
@@ -327,9 +332,10 @@ export function App() {
     try {
       await client.deleteMessage(id)
     } catch (e) {
+      if (clientRef.current !== client) return
       setError(errText(e))
     } finally {
-      setActionBusy(false)
+      if (clientRef.current === client) setActionBusy(false)
     }
   }
 
@@ -345,6 +351,7 @@ export function App() {
       else await client.addReaction(id, r.emoji_name)
       // State updates arrive via the reaction event.
     } catch (e) {
+      if (clientRef.current !== client) return
       setError(errText(e))
     }
   }
