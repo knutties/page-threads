@@ -29,6 +29,7 @@ export function createReadMarker(opts: {
       opts
         .flush(ids)
         .then(() => {
+          if (disposed) return
           for (const id of ids) flushed.add(id)
         })
         .catch(() => {

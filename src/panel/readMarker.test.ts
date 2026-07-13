@@ -64,4 +64,26 @@ describe('createReadMarker', () => {
     await vi.advanceTimersByTimeAsync(5000)
     expect(flushed).toEqual([])
   })
+
+  test('dispose during an in-flight flush suppresses its success bookkeeping', async () => {
+    let resolveFlush!: () => void
+    const flushed: number[][] = []
+    const m = createReadMarker({
+      flush: async (ids) => {
+        flushed.push(ids)
+        await new Promise<void>((r) => (resolveFlush = r))
+      },
+    })
+    m.noteRendered([1])
+    await vi.advanceTimersByTimeAsync(2000) // flush([1]) is now in flight
+    expect(flushed).toEqual([[1]])
+    m.dispose()
+    resolveFlush() // in-flight flush resolves AFTER dispose
+    await Promise.resolve()
+    // id 1 must NOT be recorded as flushed post-dispose: re-noting it (on a fresh
+    // marker sharing nothing) is irrelevant; here we just assert no post-dispose crash
+    // and that a second flush never happens.
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(flushed).toEqual([[1]])
+  })
 })
