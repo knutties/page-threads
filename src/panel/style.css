@@ -40,3 +40,19 @@ header .title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space:
 .error { display: flex; align-items: center; gap: 8px; }
 .error > span { flex: 1; }
 .error .retry { flex: none; }
+
+.setup { display: flex; flex-direction: column; gap: 10px; padding: 16px; }
+.setup h2 { margin: 0; }
+.setup p { margin: 0; color: #555; }
+.setup label { display: flex; flex-direction: column; gap: 4px; font-weight: 600; font-size: 13px; }
+.setup input { padding: 6px; font-size: 14px; }
+.setup small { font-weight: 400; color: #777; }
+.tabs { display: flex; gap: 4px; }
+.tab { padding: 4px 10px; border: 1px solid #ccc; background: #f5f5f5; cursor: pointer; }
+.tab.active { background: #fff; border-bottom-color: #fff; font-weight: 600; }
+.linkish { border: none; background: none; color: #1a73e8; cursor: pointer; padding: 0; }
+.account { display: flex; flex-direction: column; gap: 12px; padding: 0 0 16px; }
+.account dl { margin: 0; padding: 0 16px; }
+.account dt { font-weight: 600; font-size: 12px; color: #777; margin-top: 8px; }
+.account dd { margin: 0; }
+.account .danger { margin: 0 16px; color: #b3261e; }
