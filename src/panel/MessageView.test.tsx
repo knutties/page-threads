@@ -1,4 +1,4 @@
-// @vitest-environment happy-dom
+// @vitest-environment jsdom
 import { fireEvent, render, screen } from '@testing-library/preact'
 import { describe, expect, test, vi } from 'vitest'
 import type { ZulipMessage } from '../shared/zulipClient'
