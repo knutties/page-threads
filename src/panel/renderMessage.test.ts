@@ -1,6 +1,5 @@
-// @vitest-environment happy-dom
+// @vitest-environment jsdom
 import { describe, expect, test } from 'vitest'
-import DOMPurify from 'dompurify'
 import { sanitizeMessageHtml } from './renderMessage'
 
 const REALM = 'https://zulip.example.com'

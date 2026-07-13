@@ -4,11 +4,10 @@ const ALLOWED_TAGS = [
   'p', 'div', 'span', 'a', 'strong', 'em', 'del', 'code', 'pre', 'blockquote',
   'ol', 'ul', 'li', 'br', 'hr', 'table', 'thead', 'tbody', 'tr', 'th', 'td',
   'time', 'sup', 'sub', 'details', 'summary',
-  'img', // never emitted: rewritten to a placeholder button by the hook below
-  'button', // only the placeholders we create ourselves
+  'img', // never survives: transformed to a placeholder button below
 ]
 
-const ALLOWED_ATTR = ['href', 'title', 'class', 'datetime', 'start', 'align', 'src', 'data-src', 'type', 'target', 'rel']
+const ALLOWED_ATTR = ['href', 'title', 'class', 'datetime', 'start', 'align', 'src']
 
 function resolveHttpUrl(raw: string, realmUrl: string): string | null {
   try {
@@ -22,36 +21,30 @@ function resolveHttpUrl(raw: string, realmUrl: string): string | null {
 /**
  * The single gate through which message HTML enters the DOM (spec §Rendering).
  * Zulip-rendered HTML in; sanitized HTML with click-to-load image placeholders out.
+ * Two phases: DOMPurify with a strict allowlist, then a DOM transform pass that
+ * (a) pins links to http(s) + new-tab + noopener, (b) rewrites every <img> to a
+ * <button class="img-placeholder" data-src>. The transform only replaces nodes
+ * with inert elements we construct, so it cannot reintroduce anything unsafe.
  */
 export function sanitizeMessageHtml(html: string, realmUrl: string): string {
-  DOMPurify.addHook('afterSanitizeAttributes', (node) => {
-    if (node.tagName === 'A') {
-      const href = node.getAttribute('href')
-      const abs = href ? resolveHttpUrl(href, realmUrl) : null
-      if (abs) node.setAttribute('href', abs)
-      else node.removeAttribute('href')
-      node.setAttribute('target', '_blank')
-      node.setAttribute('rel', 'noopener noreferrer')
-    }
-    if (node.tagName === 'IMG') {
-      const src = node.getAttribute('src')
-      const abs = src ? resolveHttpUrl(src, realmUrl) : null
-      const doc = node.ownerDocument
-      const button = doc.createElement('button')
-      button.setAttribute('type', 'button')
-      button.setAttribute('class', 'img-placeholder')
-      if (abs) button.setAttribute('data-src', abs)
-      button.textContent = '🖼️ Load image'
-      node.replaceWith(button)
-    }
-    if (node.tagName === 'BUTTON' && node.getAttribute('class') !== 'img-placeholder') {
-      // The only buttons we allow are the placeholders we just created.
-      node.remove()
-    }
-  })
-  try {
-    return DOMPurify.sanitize(html, { ALLOWED_TAGS, ALLOWED_ATTR })
-  } finally {
-    DOMPurify.removeAllHooks()
+  const clean = DOMPurify.sanitize(html, { ALLOWED_TAGS, ALLOWED_ATTR, ALLOW_DATA_ATTR: false })
+  const tpl = document.createElement('template')
+  tpl.innerHTML = clean
+  for (const a of Array.from(tpl.content.querySelectorAll('a'))) {
+    const abs = a.getAttribute('href') ? resolveHttpUrl(a.getAttribute('href')!, realmUrl) : null
+    if (abs) a.setAttribute('href', abs)
+    else a.removeAttribute('href')
+    a.setAttribute('target', '_blank')
+    a.setAttribute('rel', 'noopener noreferrer')
   }
+  for (const img of Array.from(tpl.content.querySelectorAll('img'))) {
+    const abs = img.getAttribute('src') ? resolveHttpUrl(img.getAttribute('src')!, realmUrl) : null
+    const button = document.createElement('button')
+    button.setAttribute('type', 'button')
+    button.setAttribute('class', 'img-placeholder')
+    if (abs) button.setAttribute('data-src', abs)
+    button.textContent = '🖼️ Load image'
+    img.replaceWith(button)
+  }
+  return tpl.innerHTML
 }
