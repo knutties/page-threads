@@ -94,9 +94,7 @@ admin account.
 ## Second test user (for the live-updates acceptance check)
 
 Invite a second user (Settings → Users → Invite) or reuse the realm-creation flow,
-give them their own API key, and use them from a second Chrome profile. Use them from a second Chrome profile with the same build: `dev/run-chrome.sh
-user2` and sign in as the second user through the panel's own onboarding —
-separate builds per user are no longer needed.
+give them their own API key, and use them from a second Chrome profile with the same build: `dev/run-chrome.sh user2` and sign in as the second user through the panel's own onboarding — separate builds per user are no longer needed.
 
 Notes:
 - The local server has no outgoing email, so prefer the realm-creation-link flow

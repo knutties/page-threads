@@ -67,7 +67,7 @@ describe('SetupView', () => {
     await waitFor(() => expect(screen.getByText(/unreachable/)).toBeTruthy())
   })
 
-  test('validate failure (e.g. channel missing) keeps auth step with message; password field cleared after failed submit too', async () => {
+  test('validate failure (e.g. channel missing) keeps the auth step with the message', async () => {
     render(
       <SetupView
         onComplete={() => {}}
