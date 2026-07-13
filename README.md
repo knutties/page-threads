@@ -8,7 +8,6 @@ page, using a Zulip realm as the backend. Spec: [WHAT.md](WHAT.md). Current stat
 
 ```bash
 npm install
-cp src/config.example.ts src/config.ts   # (src/config.ts is gitignored) then fill in realm URL, email, API key
 npm run build
 npm test
 ```
@@ -22,8 +21,15 @@ Backend for development: see [dev/zulip/README.md](dev/zulip/README.md).
    side panel.
 
 If your managed Chrome blocks unpacked extensions, use `dev/run-chrome.sh`
-(Chrome for Testing with the extension pre-loaded; second profile + second-user
-build: `dev/run-chrome.sh user2 dist-user2`).
+(Chrome for Testing with the extension pre-loaded; second profile: `dev/run-chrome.sh user2`).
+
+## First run
+
+Open the panel on any page: PageThreads asks for your Zulip realm URL, then
+lets you sign in with email+password (realms with password auth) or paste an
+API key (Zulip → Personal settings → Account & privacy → API key). The
+channel (default `web-threads`) must already exist on the realm. Credentials
+are stored in extension storage; use the ⚙️ menu to sign out.
 
 > **After every `npm run build`, reload the extension** (chrome://extensions →
 > ⟳ on the PageThreads card) or wipe the dev profile. Relaunching the browser
@@ -62,3 +68,14 @@ build: `dev/run-chrome.sh user2 dist-user2`).
 - [ ] While scrolled up reading history, an incoming message does NOT yank the view; at the bottom, it does scroll.
 - [ ] Enter in a CJK IME composition does not send.
 - [ ] When thread init fails (e.g. Zulip container stopped), the error bar shows Retry, and Retry recovers once the server is back.
+
+## M1b acceptance checklist
+
+- [ ] Fresh profile: onboard via email+password against the dev realm; reach a working thread view.
+- [ ] Fresh profile: onboard via API-key paste.
+- [ ] Wrong password shows Zulip's error; wrong API key shows the credentials error.
+- [ ] Unreachable realm URL errors on the realm step; a self-signed-cert realm shows the accept-the-warning hint.
+- [ ] Channel name that doesn't exist shows the "ask your admin" error; works after creating the channel.
+- [ ] ⚙️ → Sign out returns to setup; signing in as a different user gets live updates for that account (post from the Zulip web UI to verify).
+- [ ] Credentials survive a full browser restart.
+- [ ] Second profile (`dev/run-chrome.sh user2`) onboards as the second user with the SAME dist/ build — dist-user2 is gone.

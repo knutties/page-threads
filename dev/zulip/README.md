@@ -87,14 +87,16 @@ admin account.
 1. In Zulip (https://127.0.0.1:9090): create a channel named **web-threads**
    (gear icon → Channel settings → Create channel). Subscribe yourself.
 2. Personal settings → Account & privacy → API key → copy it.
-3. In this repo: `cp src/config.example.ts src/config.ts` and fill in
-   `realmUrl: 'https://127.0.0.1:9090'`, your email, the API key.
+3. Build the extension: `npm run build`.
+   After the first run, the extension will prompt you to enter your realm URL
+   and sign in (email+password or API key).
 
 ## Second test user (for the live-updates acceptance check)
 
 Invite a second user (Settings → Users → Invite) or reuse the realm-creation flow,
-give them their own API key, and use them from a second Chrome profile with its own
-`src/config.ts` build — or simply post as them from the Zulip web UI.
+give them their own API key, and use them from a second Chrome profile. Use them from a second Chrome profile with the same build: `dev/run-chrome.sh
+user2` and sign in as the second user through the panel's own onboarding —
+separate builds per user are no longer needed.
 
 Notes:
 - The local server has no outgoing email, so prefer the realm-creation-link flow

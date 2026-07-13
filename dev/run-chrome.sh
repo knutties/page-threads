@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Launch Chrome for Testing with the PageThreads extension pre-loaded.
 # Usage: dev/run-chrome.sh [profile-name] [extension-dir]
-#   dev/run-chrome.sh                  -> profile user1, extension dist/
-#   dev/run-chrome.sh user2 dist-user2 -> second profile with the second-user build
+#   dev/run-chrome.sh          -> profile user1, extension dist/
+#   dev/run-chrome.sh user2    -> second profile, same dist/ (sign in as another user)
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
