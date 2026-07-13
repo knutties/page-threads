@@ -1,19 +1,21 @@
 import { useEffect, useReducer, useRef, useState } from 'preact/hooks'
-import { config } from '../config'
-import type { PageEntity, PanelToSw, SwToPanel } from '../shared/messages'
+import { createCredentialsStore, type Credentials } from '../shared/credentials'
+import type { PageEntity, PanelToSw, RuntimeToSw, SwToPanel } from '../shared/messages'
 import { createSettingsStore, DEFAULT_SETTINGS, type Settings } from '../shared/settings'
 import { matchTopicByKey, topicKey, topicName } from '../shared/topic'
 import { ZulipClient } from '../shared/zulipClient'
+import { AccountView } from './AccountView'
 import { Composer } from './Composer'
 import { Drafts } from './drafts'
 import { topicMatchesKey } from './eventMatch'
 import { panelTarget, type PanelTargetState } from './panelTarget'
+import { SetupView } from './SetupView'
 import { ThreadView } from './ThreadView'
 import { threadReducer } from './threadState'
 
-const client = new ZulipClient(config)
 const drafts = new Drafts()
 const settingsStore = createSettingsStore()
+const credentialsStore = createCredentialsStore()
 
 interface Thread {
   entity: PageEntity
@@ -22,17 +24,26 @@ interface Thread {
   existingTopic: string | null
 }
 
-function headerMessage(entity: PageEntity): string {
+function headerMessage(entity: PageEntity, email: string): string {
   const representativeUrl = entity.entityUri.replace(/^web:/, '')
   return [
     `🔗 Discussion for: ${entity.title}`,
     `Entity: \`${entity.entityUri}\` (resolver web@1)`,
     `Link: ${representativeUrl}`,
-    `Started by ${config.email}`,
+    `Started by ${email}`,
   ].join('\n')
 }
 
+function notifySwCredentialsChanged(): void {
+  const msg: RuntimeToSw = { type: 'credentialsChanged' }
+  void chrome.runtime.sendMessage(msg).catch(() => {})
+}
+
 export function App() {
+  // undefined = still loading from storage; null = not configured (show setup)
+  const [credentials, setCredentials] = useState<Credentials | null | undefined>(undefined)
+  const [fullName, setFullName] = useState<string | undefined>(undefined)
+  const [showAccount, setShowAccount] = useState(false)
   const [thread, setThread] = useState<Thread | null>(null)
   const [messages, dispatch] = useReducer(threadReducer, [])
   const [error, setError] = useState<string | null>(null)
@@ -44,15 +55,52 @@ export function App() {
   const targetRef = useRef<PanelTargetState>({ pinned: false, currentUri: null })
   const settingsRef = useRef<Settings>(DEFAULT_SETTINGS)
   const portRef = useRef<chrome.runtime.Port | null>(null)
+  const clientRef = useRef<ZulipClient | null>(null)
+  const credsRef = useRef<Credentials | null>(null)
+
+  function applyCredentials(c: Credentials | null) {
+    credsRef.current = c
+    clientRef.current = c ? new ZulipClient(c) : null
+    setCredentials(c)
+  }
+
+  useEffect(() => {
+    void credentialsStore.load().then(applyCredentials)
+  }, [])
+
+  useEffect(() => {
+    void settingsStore.load().then((s) => (settingsRef.current = s))
+    return settingsStore.watch((s) => (settingsRef.current = s))
+  }, [])
+
+  async function completeSetup(c: Credentials) {
+    await credentialsStore.save(c)
+    applyCredentials(c)
+    notifySwCredentialsChanged()
+  }
+
+  async function signOut() {
+    await credentialsStore.clear()
+    targetRef.current = { pinned: false, currentUri: null }
+    setThread(null)
+    dispatch({ type: 'history', messages: [] })
+    setDraftText('')
+    setPinned(false)
+    setError(null)
+    setShowAccount(false)
+    setFullName(undefined)
+    applyCredentials(null)
+    notifySwCredentialsChanged()
+  }
+
+  function requestActiveEntity() {
+    portRef.current?.postMessage({ type: 'getActiveEntity' } satisfies PanelToSw)
+  }
 
   function onDraftInput(text: string) {
     setDraftText(text)
     const uri = threadRef.current?.entity.entityUri
     if (uri) drafts.set(uri, text)
-  }
-
-  function requestActiveEntity() {
-    portRef.current?.postMessage({ type: 'getActiveEntity' } satisfies PanelToSw)
   }
 
   function applyPush(entity: PageEntity | null) {
@@ -83,11 +131,7 @@ export function App() {
   }
 
   useEffect(() => {
-    void settingsStore.load().then((s) => (settingsRef.current = s))
-    return settingsStore.watch((s) => (settingsRef.current = s))
-  }, [])
-
-  useEffect(() => {
+    if (!credentials) return
     let disposed = false
     let port: chrome.runtime.Port
     let pingTimer: number | undefined
@@ -142,13 +186,17 @@ export function App() {
     return () => {
       disposed = true
       window.clearInterval(pingTimer)
+      portRef.current = null
       port.disconnect()
     }
-  }, [])
+  }, [credentials])
 
   async function initThread(entity: PageEntity) {
+    const client = clientRef.current
+    const creds = credsRef.current
+    if (!client || !creds) return
     const key = await topicKey(entity.entityUri)
-    const streamId = await client.getStreamId(config.channelName)
+    const streamId = await client.getStreamId(creds.channelName)
     const topics = await client.getTopics(streamId)
     const existingTopic = matchTopicByKey(topics, key)
     // A later push may have switched targets while we awaited; don't clobber it.
@@ -158,7 +206,10 @@ export function App() {
   }
 
   async function loadHistory(topic: string, forUri: string) {
-    const messages = await client.getMessages(config.channelName, topic)
+    const client = clientRef.current
+    const creds = credsRef.current
+    if (!client || !creds) return
+    const messages = await client.getMessages(creds.channelName, topic)
     // The user may have switched targets while the fetch was in flight.
     if (targetRef.current.currentUri !== forUri) return
     dispatch({ type: 'history', messages })
@@ -166,7 +217,9 @@ export function App() {
 
   async function send(text: string) {
     const t = threadRef.current
-    if (!t) return
+    const client = clientRef.current
+    const creds = credsRef.current
+    if (!t || !client || !creds) return
     setError(null)
     try {
       let topic = t.existingTopic
@@ -175,13 +228,13 @@ export function App() {
         // Header first (spec §6.2); on failure retry once, then proceed regardless —
         // the topicKey suffix still makes the thread resolvable.
         try {
-          await client.sendMessage(config.channelName, topic, headerMessage(t.entity))
+          await client.sendMessage(creds.channelName, topic, headerMessage(t.entity, creds.email))
         } catch {
-          await client.sendMessage(config.channelName, topic, headerMessage(t.entity)).catch(() => {})
+          await client.sendMessage(creds.channelName, topic, headerMessage(t.entity, creds.email)).catch(() => {})
         }
         setThread({ ...t, existingTopic: topic })
       }
-      await client.sendMessage(config.channelName, topic, text)
+      await client.sendMessage(creds.channelName, topic, text)
       drafts.clear(t.entity.entityUri)
       if (targetRef.current.currentUri === t.entity.entityUri) setDraftText('')
       await loadHistory(topic, t.entity.entityUri)
@@ -198,6 +251,33 @@ export function App() {
     if (action === 'refresh') requestActiveEntity()
   }
 
+  function openAccount() {
+    setShowAccount(true)
+    if (!fullName && clientRef.current) {
+      clientRef.current
+        .getOwnUser()
+        .then((u) => setFullName(u.fullName))
+        .catch(() => {})
+    }
+  }
+
+  if (credentials === undefined) {
+    return <div class="empty">Loading…</div>
+  }
+  if (credentials === null) {
+    return <SetupView onComplete={(c) => void completeSetup(c)} />
+  }
+  if (showAccount) {
+    return (
+      <AccountView
+        credentials={credentials}
+        fullName={fullName}
+        onClose={() => setShowAccount(false)}
+        onSignOut={() => void signOut()}
+      />
+    )
+  }
+
   return (
     <div class="app">
       <header title={thread?.entity.entityUri}>
@@ -208,6 +288,9 @@ export function App() {
           onClick={togglePin}
         >
           📌
+        </button>
+        <button class="pin" title="Account" onClick={openAccount}>
+          ⚙️
         </button>
       </header>
       {error && (
