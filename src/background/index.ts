@@ -55,9 +55,15 @@ function broadcast(msg: SwToPanel): void {
     try {
       port.postMessage(msg)
     } catch {
-      ports.delete(port) // postMessage throws once the port is gone; drop it
+      removePort(port) // postMessage throws once the port is gone; drop it
     }
   }
+}
+
+function removePort(port: chrome.runtime.Port): void {
+  // Idempotent: only notify the lifecycle when this port was actually still tracked,
+  // so a dead-port cleanup in broadcast() and a later onDisconnect can't double-count.
+  if (ports.delete(port)) lifecycle.portDisconnected()
 }
 
 /** tabEntities is a cache; on a miss (SW restarted since the page loaded), ask the tab. */
@@ -150,7 +156,6 @@ chrome.runtime.onConnect.addListener((port) => {
   })
 
   port.onDisconnect.addListener(() => {
-    ports.delete(port)
-    lifecycle.portDisconnected()
+    removePort(port)
   })
 })
