@@ -77,3 +77,6 @@ header .title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space:
 .zulip-rendered .user-mention { background: #e8f0fe; border-radius: 3px; padding: 0 2px; }
 .zulip-rendered table { border-collapse: collapse; }
 .zulip-rendered th, .zulip-rendered td { border: 1px solid #ddd; padding: 2px 6px; }
+.gate { flex: 1; display: flex; flex-direction: column; gap: 10px; align-items: center; justify-content: center; padding: 24px; text-align: center; }
+.gate-title { font-weight: 600; overflow-wrap: anywhere; }
+.gate .hint { color: #777; font-size: 12px; }
