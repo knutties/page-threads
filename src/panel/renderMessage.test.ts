@@ -89,3 +89,34 @@ describe('sanitizeMessageHtml — Zulip markup passes', () => {
     expect(out).toContain(`href="${REALM}/#narrow/channel/4/topic/T"`)
   })
 })
+
+describe('sanitizeMessageHtml — per-tag attribute allowlist', () => {
+  test('href only survives on anchors, dropped elsewhere', () => {
+    // <td> must be wrapped in <table><tr> — a bare <td> is dropped by HTML
+    // parsing (foster-parenting rules), independent of sanitization.
+    const out = s('<table><tr><td href="https://evil.com/x">c</td></tr></table>')
+    expect(out).toContain('<td')
+    expect(out).not.toContain('href')
+  })
+
+  test('datetime only survives on <time>', () => {
+    expect(s('<span datetime="2020-01-01">x</span>')).not.toContain('datetime')
+    expect(s('<time datetime="2020-01-01">x</time>')).toContain('datetime')
+  })
+
+  test('start only survives on <ol>', () => {
+    expect(s('<ul start="3"><li>x</li></ul>')).not.toContain('start')
+    expect(s('<ol start="3"><li>x</li></ol>')).toContain('start')
+  })
+
+  test('align only survives on table cells', () => {
+    expect(s('<p align="center">x</p>')).not.toContain('align')
+    // <td> must be wrapped in <table><tr> — a bare <td> is dropped by HTML
+    // parsing (foster-parenting rules), independent of sanitization.
+    expect(s('<table><tr><td align="right">x</td></tr></table>')).toContain('align')
+  })
+
+  test('class still survives on any allowed tag', () => {
+    expect(s('<span class="user-mention">x</span>')).toContain('class="user-mention"')
+  })
+})

@@ -25,3 +25,4 @@ export type SwToPanel =
   | { type: 'messageUpdated'; messageId: number; renderedContent: string }
   | { type: 'messageDeleted'; messageId: number }
   | { type: 'reactionChanged'; op: 'add' | 'remove'; messageId: number; reaction: ZulipReaction }
+  | { type: 'messageMoved'; messageId: number; newTopic: string }

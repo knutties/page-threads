@@ -1,0 +1,9 @@
+:root { font-family: system-ui, sans-serif; font-size: 14px; color: #222; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+.options { max-width: 640px; margin: 24px auto; padding: 0 16px; }
+.options h1 { font-size: 20px; }
+.options section { margin: 20px 0; }
+.options label { display: flex; gap: 8px; align-items: flex-start; font-weight: 600; }
+.options .hint { margin: 4px 0 0 24px; color: #666; font-weight: 400; }
+.loading { padding: 24px; color: #777; }

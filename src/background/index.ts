@@ -17,8 +17,13 @@ const lifecycle = createLifecycle({
       onEvent: (event) => {
         if (event.type === 'message' && event.message) {
           broadcast({ type: 'newMessage', topic: event.message.subject, message: event.message })
-        } else if (event.type === 'update_message' && event.message_id != null && event.rendered_content != null) {
-          broadcast({ type: 'messageUpdated', messageId: event.message_id, renderedContent: event.rendered_content })
+        } else if (event.type === 'update_message' && event.message_id != null) {
+          if (event.rendered_content != null) {
+            broadcast({ type: 'messageUpdated', messageId: event.message_id, renderedContent: event.rendered_content })
+          }
+          if (event.subject != null && event.orig_subject != null && event.subject !== event.orig_subject) {
+            broadcast({ type: 'messageMoved', messageId: event.message_id, newTopic: event.subject })
+          }
         } else if (event.type === 'delete_message' && event.message_id != null) {
           broadcast({ type: 'messageDeleted', messageId: event.message_id })
         } else if (

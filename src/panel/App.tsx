@@ -11,6 +11,7 @@ import { topicMatchesKey } from './eventMatch'
 import type { ReactionInput } from './MessageView'
 import { panelTarget, type PanelTargetState } from './panelTarget'
 import { createReadMarker, type ReadMarker } from './readMarker'
+import { shouldGate } from './resolveGate'
 import { SetupView } from './SetupView'
 import { ThreadView } from './ThreadView'
 import { threadReducer } from './threadState'
@@ -53,6 +54,7 @@ export function App() {
   const [sending, setSending] = useState(false)
   const [editState, setEditState] = useState<{ id: number; raw: string } | null>(null)
   const [actionBusy, setActionBusy] = useState(false)
+  const [pendingEntity, setPendingEntity] = useState<PageEntity | null>(null)
 
   const threadRef = useRef<Thread | null>(null)
   threadRef.current = thread
@@ -64,6 +66,7 @@ export function App() {
   const sendingRef = useRef(false) // synchronous double-send latch (backlog #3)
   const initGenRef = useRef(0) // per-init generation token (backlog #7)
   const readMarkerRef = useRef<ReadMarker | null>(null)
+  const checkedRef = useRef(false)
 
   function applyCredentials(c: Credentials | null) {
     credsRef.current = c
@@ -101,6 +104,8 @@ export function App() {
     setPinned(false)
     setError(null)
     setEditState(null)
+    setPendingEntity(null)
+    checkedRef.current = false
   }
 
   useEffect(() => {
@@ -152,28 +157,47 @@ export function App() {
     )
     targetRef.current = state
     if (action === 'switch' && entity) {
-      const generation = ++initGenRef.current
+      checkedRef.current = false
       setError(null)
       setThread(null)
       setEditState(null)
       dispatch({ type: 'history', messages: [] })
       setDraftText(drafts.get(entity.entityUri))
-      initThread(entity).catch((e) => {
-        // Backlog #7: only the LATEST init may surface failure / re-arm the reducer.
-        if (generation !== initGenRef.current) return
-        setError(errText(e))
-        targetRef.current = panelTarget(
-          targetRef.current,
-          { type: 'initFailed', uri: entity.entityUri },
-          settingsRef.current.onNonWebPage
-        ).state
-      })
+      if (shouldGate(settingsRef.current.resolveMode, checkedRef.current)) {
+        setPendingEntity(entity)
+      } else {
+        setPendingEntity(null)
+        void resolveEntity(entity)
+      }
     } else if (action === 'clear') {
+      setPendingEntity(null)
       setThread(null)
       setEditState(null)
       dispatch({ type: 'history', messages: [] })
       setDraftText('')
     }
+  }
+
+  function resolveEntity(entity: PageEntity) {
+    const generation = ++initGenRef.current
+    return initThread(entity).catch((e) => {
+      // Backlog #7: only the LATEST init may surface failure / re-arm the reducer.
+      if (generation !== initGenRef.current) return
+      setError(errText(e))
+      targetRef.current = panelTarget(
+        targetRef.current,
+        { type: 'initFailed', uri: entity.entityUri },
+        settingsRef.current.onNonWebPage
+      ).state
+    })
+  }
+
+  function checkForDiscussion() {
+    const entity = pendingEntity
+    if (!entity) return
+    checkedRef.current = true
+    setPendingEntity(null)
+    void resolveEntity(entity)
   }
 
   useEffect(() => {
@@ -196,6 +220,13 @@ export function App() {
       } else if (msg.type === 'messageDeleted') {
         dispatch({ type: 'remove', id: msg.messageId })
         setEditState((cur) => (cur?.id === msg.messageId ? null : cur))
+      } else if (msg.type === 'messageMoved') {
+        const t = threadRef.current
+        // Removed from THIS thread if it moved to a topic that isn't ours.
+        if (t && !topicMatchesKey(msg.newTopic, t.key)) {
+          dispatch({ type: 'remove', id: msg.messageId })
+          setEditState((cur) => (cur?.id === msg.messageId ? null : cur))
+        }
       } else if (msg.type === 'reactionChanged') {
         dispatch({ type: 'reaction', op: msg.op, id: msg.messageId, reaction: msg.reaction })
       } else if (msg.type === 'reconnected') {
@@ -408,23 +439,31 @@ export function App() {
           )}
         </div>
       )}
-      <ThreadView
-        messages={messages}
-        hasThread={!!thread?.existingTopic}
-        noPage={!thread && !error}
-        threadKey={thread?.key ?? null}
-        ownEmail={credentials.email}
-        ownUserId={ownUserId}
-        realmUrl={credentials.realmUrl}
-        editState={editState}
-        busy={actionBusy}
-        onStartEdit={(id) => void startEdit(id)}
-        onCancelEdit={() => setEditState(null)}
-        onSaveEdit={(id, content) => void saveEdit(id, content)}
-        onDelete={(id) => void deleteMessage(id)}
-        onToggleReaction={(id, r) => void toggleReaction(id, r)}
-        onRendered={(ids) => readMarkerRef.current?.noteRendered(ids)}
-      />
+      {pendingEntity ? (
+        <div class="gate">
+          <div class="gate-title">{pendingEntity.title || pendingEntity.entityUri}</div>
+          <button onClick={checkForDiscussion}>Check for discussion</button>
+          <p class="hint">Strict privacy is on. No request is sent to your realm until you click.</p>
+        </div>
+      ) : (
+        <ThreadView
+          messages={messages}
+          hasThread={!!thread?.existingTopic}
+          noPage={!thread && !error}
+          threadKey={thread?.key ?? null}
+          ownEmail={credentials.email}
+          ownUserId={ownUserId}
+          realmUrl={credentials.realmUrl}
+          editState={editState}
+          busy={actionBusy}
+          onStartEdit={(id) => void startEdit(id)}
+          onCancelEdit={() => setEditState(null)}
+          onSaveEdit={(id, content) => void saveEdit(id, content)}
+          onDelete={(id) => void deleteMessage(id)}
+          onToggleReaction={(id, r) => void toggleReaction(id, r)}
+          onRendered={(ids) => readMarkerRef.current?.noteRendered(ids)}
+        />
+      )}
       <Composer
         value={draftText}
         onInput={onDraftInput}

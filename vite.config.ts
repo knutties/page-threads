@@ -9,6 +9,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         panel: 'src/panel/index.html',
+        options: 'src/options/index.html',
         background: 'src/background/index.ts',
       },
       output: {
