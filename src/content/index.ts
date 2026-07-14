@@ -1,10 +1,18 @@
 import { canonicalize } from '../shared/canonicalize'
 import type { ContentToSw, SwToContent } from '../shared/messages'
+import { createRulesetStore, isBlocked, type Ruleset } from '../shared/ruleset'
 import { createNavWatcher } from './navWatcher'
+
+const rulesetStore = createRulesetStore()
+let ruleset: Ruleset = { canonical: {}, blocked: [] }
+
+function pageDomain(): string {
+  return location.hostname
+}
 
 function resolveUri(): string {
   const link = document.querySelector<HTMLLinkElement>('link[rel="canonical"]')
-  return 'web:' + canonicalize(location.href, link?.getAttribute('href') ?? null)
+  return 'web:' + canonicalize(location.href, link?.getAttribute('href') ?? null, ruleset.canonical)
 }
 
 function report(entityUri: string): void {
@@ -14,16 +22,35 @@ function report(entityUri: string): void {
   })
 }
 
-const initialUri = resolveUri()
-report(initialUri)
+function resolveAndReport(): void {
+  // Blocked domains: send nothing, so the SW never learns the page (spec §7).
+  if (isBlocked(pageDomain(), ruleset.blocked)) return
+  report(resolveUri())
+}
 
-const watcher = createNavWatcher({ resolve: resolveUri, onChange: report })
-watcher.seed(initialUri)
+const watcher = createNavWatcher({
+  resolve: () => (isBlocked(pageDomain(), ruleset.blocked) ? 'blocked:' + pageDomain() : resolveUri()),
+  onChange: (uri) => {
+    if (!uri.startsWith('blocked:')) report(uri)
+  },
+})
+
+// Ruleset governs canonicalization AND blocking; load it before the first report.
+void rulesetStore.load().then((rs) => {
+  ruleset = rs
+  watcher.seed(isBlocked(pageDomain(), rs.blocked) ? 'blocked:' + pageDomain() : resolveUri())
+  resolveAndReport()
+})
+
+// A change to rules or the block-list re-resolves on the next navigation; also
+// re-evaluate the current page once so a freshly-blocked domain stops reporting.
+rulesetStore.watch((rs) => {
+  ruleset = rs
+  resolveAndReport()
+})
 
 window.addEventListener('popstate', () => watcher.trigger())
 
-// SPA detection (spec §Content script): Navigation API where available,
-// else title MutationObserver + 500ms location.href poll.
 const navigation = (window as { navigation?: EventTarget }).navigation
 if (navigation) {
   navigation.addEventListener('navigate', () => watcher.trigger())
@@ -46,9 +73,13 @@ if (navigation) {
 }
 
 // The SW's tab-entity map dies with every MV3 service-worker restart; let it
-// re-query this tab instead of silently losing the mapping.
+// re-query this tab. A blocked domain returns nothing usable.
 chrome.runtime.onMessage.addListener((msg: SwToContent, _sender, sendResponse) => {
   if (msg.type === 'queryEntity') {
-    sendResponse({ entityUri: resolveUri(), title: document.title })
+    if (isBlocked(pageDomain(), ruleset.blocked)) {
+      sendResponse(null)
+    } else {
+      sendResponse({ entityUri: resolveUri(), title: document.title })
+    }
   }
 })
