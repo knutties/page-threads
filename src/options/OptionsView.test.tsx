@@ -59,4 +59,16 @@ describe('OptionsView', () => {
     fireEvent.click(hold) // was checked (hold); unchecking selects 'clear'
     await waitFor(() => expect(store.current.onNonWebPage).toBe('clear'))
   })
+
+  test('a failed save reverts the toggle and shows an error', async () => {
+    const store = fakeStore()
+    store.save = async () => {
+      throw new Error('quota')
+    }
+    render(<OptionsView store={store} rulesStore={fakeRulesStore()} />)
+    const strict = (await screen.findByLabelText(/Strict privacy/i)) as HTMLInputElement
+    fireEvent.click(strict)
+    await waitFor(() => expect(screen.getByText(/Could not save/i)).toBeTruthy())
+    expect(strict.checked).toBe(false) // reverted
+  })
 })

@@ -13,6 +13,7 @@ export function OptionsView({
 }) {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS)
   const [loaded, setLoaded] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     void store.load().then((s) => {
@@ -23,9 +24,14 @@ export function OptionsView({
   }, [])
 
   async function update(patch: Partial<Settings>) {
-    const next = { ...settings, ...patch }
-    setSettings(next)
-    await store.save(patch)
+    const prev = settings
+    setSettings({ ...settings, ...patch })
+    try {
+      await store.save(patch)
+    } catch {
+      setSettings(prev)
+      setError('Could not save — try again.')
+    }
   }
 
   if (!loaded) return <div class="loading">Loading…</div>
@@ -33,6 +39,7 @@ export function OptionsView({
   return (
     <div class="options">
       <h1>PageThreads settings</h1>
+      {error && <div class="error" role="alert" onClick={() => setError(null)}>{error}</div>}
 
       <section>
         <label>
