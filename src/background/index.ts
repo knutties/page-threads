@@ -113,6 +113,9 @@ chrome.runtime.onMessage.addListener((msg: RuntimeToSw, sender) => {
   if (msg.type === 'pageEntity' && sender.tab?.id != null) {
     tabEntities.set(sender.tab.id, { entityUri: msg.entityUri, title: msg.title })
     if (sender.tab.active) void pushActiveEntity()
+  } else if (msg.type === 'pageBlocked' && sender.tab?.id != null) {
+    tabEntities.delete(sender.tab.id)
+    if (sender.tab.active) void pushActiveEntity()
   } else if (msg.type === 'credentialsChanged') {
     void lifecycle.reloadCredentials()
   }

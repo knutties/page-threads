@@ -66,7 +66,7 @@ export function App() {
   const sendingRef = useRef(false) // synchronous double-send latch (backlog #3)
   const initGenRef = useRef(0) // per-init generation token (backlog #7)
   const readMarkerRef = useRef<ReadMarker | null>(null)
-  const checkedRef = useRef(false)
+  const settingsLoadedRef = useRef(false)
 
   function applyCredentials(c: Credentials | null) {
     credsRef.current = c
@@ -105,7 +105,6 @@ export function App() {
     setError(null)
     setEditState(null)
     setPendingEntity(null)
-    checkedRef.current = false
   }
 
   useEffect(() => {
@@ -118,7 +117,10 @@ export function App() {
   }, [])
 
   useEffect(() => {
-    void settingsStore.load().then((s) => (settingsRef.current = s))
+    void settingsStore.load().then((s) => {
+      settingsRef.current = s
+      settingsLoadedRef.current = true
+    })
     return settingsStore.watch((s) => (settingsRef.current = s))
   }, [])
 
@@ -150,6 +152,12 @@ export function App() {
   }
 
   function applyPush(entity: PageEntity | null) {
+    if (!settingsLoadedRef.current) {
+      // Don't resolve anything (which could reveal the page to the realm in
+      // strict mode) until we know the user's resolveMode. Re-request shortly.
+      window.setTimeout(() => requestActiveEntity(), 50)
+      return
+    }
     const { state, action } = panelTarget(
       targetRef.current,
       { type: 'push', entity },
@@ -157,13 +165,12 @@ export function App() {
     )
     targetRef.current = state
     if (action === 'switch' && entity) {
-      checkedRef.current = false
       setError(null)
       setThread(null)
       setEditState(null)
       dispatch({ type: 'history', messages: [] })
       setDraftText(drafts.get(entity.entityUri))
-      if (shouldGate(settingsRef.current.resolveMode, checkedRef.current)) {
+      if (shouldGate(settingsRef.current.resolveMode)) {
         setPendingEntity(entity)
       } else {
         setPendingEntity(null)
@@ -195,7 +202,6 @@ export function App() {
   function checkForDiscussion() {
     const entity = pendingEntity
     if (!entity) return
-    checkedRef.current = true
     setPendingEntity(null)
     void resolveEntity(entity)
   }

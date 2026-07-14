@@ -76,3 +76,69 @@ describe('normalization (spec §4.4 step 2)', () => {
     )
   })
 })
+
+describe('per-domain rules (spec §4.4 step 3)', () => {
+  const hnRule = { 'news.ycombinator.com': { keepParams: ['id'] } }
+  const ytRule = { 'youtube.com': { keepParams: ['v'], pathRewrite: '/watch' } }
+
+  test('keepParams narrows the query to only the listed params', () => {
+    expect(
+      canonicalize('https://news.ycombinator.com/item?id=42&utm_source=x&foo=bar', null, hnRule)
+    ).toBe('https://news.ycombinator.com/item?id=42')
+  })
+
+  test('a page with none of the kept params drops all query', () => {
+    expect(canonicalize('https://news.ycombinator.com/news?p=2', null, hnRule)).toBe(
+      'https://news.ycombinator.com/news'
+    )
+  })
+
+  test('pathRewrite replaces the path; keepParams keeps v', () => {
+    expect(
+      canonicalize('https://www.youtube.com/watch?v=abc123&list=xyz&t=10', null, ytRule)
+    ).toBe('https://www.youtube.com/watch?v=abc123')
+  })
+
+  test('a domain with no rule is unchanged by the rules pass', () => {
+    expect(canonicalize('https://example.com/a?z=1&a=2', null, hnRule)).toBe(
+      'https://example.com/a?a=2&z=1'
+    )
+  })
+
+  test('rules apply on subdomains of the registrable domain', () => {
+    expect(canonicalize('https://m.youtube.com/watch?v=q&extra=1', null, ytRule)).toBe(
+      'https://m.youtube.com/watch?v=q'
+    )
+  })
+
+  test('omitting the ruleset behaves exactly as before', () => {
+    expect(canonicalize('https://news.ycombinator.com/item?id=42&foo=bar', null)).toBe(
+      'https://news.ycombinator.com/item?foo=bar&id=42'
+    )
+  })
+
+  test('an accepted canonical link short-circuits before domain rules', () => {
+    expect(
+      canonicalize(
+        'https://news.ycombinator.com/item?id=42&foo=bar',
+        'https://news.ycombinator.com/canonical',
+        hnRule
+      )
+    ).toBe('https://news.ycombinator.com/canonical')
+  })
+
+  test('keepParams:[] drops all query params; undefined leaves them', () => {
+    const dropAll = { 'x.com': { keepParams: [] as string[] } }
+    expect(canonicalize('https://x.com/a?id=1&b=2', null, dropAll)).toBe('https://x.com/a')
+    const noRule = { 'other.com': { keepParams: ['id'] } }
+    expect(canonicalize('https://x.com/a?b=2&a=1', null, noRule)).toBe('https://x.com/a?a=1&b=2')
+  })
+
+  test('a rule keyed by an exact host applies across the registrable domain (like isBlocked)', () => {
+    const rule = { 'news.ycombinator.com': { keepParams: ['id'] } }
+    // a different subdomain of the same registrable domain is also covered
+    expect(canonicalize('https://old.ycombinator.com/item?id=9&x=1', null, rule)).toBe(
+      'https://old.ycombinator.com/item?id=9'
+    )
+  })
+})
