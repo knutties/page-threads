@@ -126,4 +126,26 @@ describe('createReadMarker', () => {
     // attempt 2 succeeded, so [3] gets a fresh budget: 1 + 3 = 4 failing attempts for it
     expect(attempts).toBe(1 + 1 + 4)
   })
+
+  test('a newly-noted id gets a fresh retry budget even if merged into a failing batch', async () => {
+    let attempts = 0
+    const m = createReadMarker({
+      flush: async () => {
+        attempts++
+        throw new Error('offline')
+      },
+      maxRetries: 2,
+    })
+    m.noteRendered([1])
+    await vi.advanceTimersByTimeAsync(2000) // attempt 1 (failures=1)
+    await vi.advanceTimersByTimeAsync(2000) // attempt 2 (failures=2)
+    m.noteRendered([2]) // NEW id → resets the failure budget
+    await vi.advanceTimersByTimeAsync(2000) // attempt (failures back to 1 after reset then ++)
+    await vi.advanceTimersByTimeAsync(2000)
+    await vi.advanceTimersByTimeAsync(2000)
+    // Without the reset, [1,2] would have been dropped at attempt 3 (failures 3 > 2).
+    // With the reset, the batch containing the new id 2 gets a fresh 2-retry budget,
+    // so more attempts occur. Assert at least 5 attempts happened (proving no early drop).
+    expect(attempts).toBeGreaterThanOrEqual(5)
+  })
 })

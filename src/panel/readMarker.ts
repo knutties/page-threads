@@ -62,6 +62,7 @@ export function createReadMarker(opts: {
           added = true
         }
       }
+      if (added) failures = 0 // new content restarts the consecutive-failure budget
       if (added || pending.size) schedule()
     },
     dispose() {
