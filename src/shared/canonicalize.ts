@@ -29,8 +29,17 @@ function acceptableCanonical(canonicalHref: string, pageHref: string): string | 
 /** Spec §4.4 step 3: per-domain keepParams narrowing + pathRewrite. Pure; no-op when no rule matches. */
 function applyDomainRules(url: string, canonical: Record<string, CanonicalRule>): string {
   const u = new URL(url)
-  const registrable = getDomain(u.hostname)
-  const rule = (registrable && canonical[registrable]) || canonical[u.hostname]
+  const pageReg = getDomain(u.hostname) ?? u.hostname
+  // Match rule keys by registrable domain — the SAME notion isBlocked uses — so a
+  // domain string means the same thing in `canonical` and `blocked`. A key like
+  // "news.ycombinator.com" therefore applies to the whole ycombinator.com family.
+  let rule: CanonicalRule | undefined
+  for (const [key, r] of Object.entries(canonical)) {
+    if ((getDomain(key) ?? key) === pageReg) {
+      rule = r
+      break
+    }
+  }
   if (!rule) return url
   if (rule.pathRewrite !== undefined) u.pathname = rule.pathRewrite
   if (rule.keepParams !== undefined) {

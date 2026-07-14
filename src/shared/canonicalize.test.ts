@@ -126,4 +126,19 @@ describe('per-domain rules (spec §4.4 step 3)', () => {
       )
     ).toBe('https://news.ycombinator.com/canonical')
   })
+
+  test('keepParams:[] drops all query params; undefined leaves them', () => {
+    const dropAll = { 'x.com': { keepParams: [] as string[] } }
+    expect(canonicalize('https://x.com/a?id=1&b=2', null, dropAll)).toBe('https://x.com/a')
+    const noRule = { 'other.com': { keepParams: ['id'] } }
+    expect(canonicalize('https://x.com/a?b=2&a=1', null, noRule)).toBe('https://x.com/a?a=1&b=2')
+  })
+
+  test('a rule keyed by an exact host applies across the registrable domain (like isBlocked)', () => {
+    const rule = { 'news.ycombinator.com': { keepParams: ['id'] } }
+    // a different subdomain of the same registrable domain is also covered
+    expect(canonicalize('https://old.ycombinator.com/item?id=9&x=1', null, rule)).toBe(
+      'https://old.ycombinator.com/item?id=9'
+    )
+  })
 })
