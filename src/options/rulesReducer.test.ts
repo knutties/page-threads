@@ -78,4 +78,10 @@ describe('validateRuleset', () => {
     expect(r.ok).toBe(false)
     if (!r.ok) expect(r.error).toContain(msg)
   })
+
+  test.each(['__proto__', 'constructor', 'prototype'])('rejects the dangerous domain key %s', (key) => {
+    const r = validateRuleset({ canonical: { [key]: { keepParams: ['id'] } }, blocked: [] })
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.error).toContain('reserved')
+  })
 })

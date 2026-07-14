@@ -64,8 +64,11 @@ export function validateRuleset(
   if (typeof canonicalRaw !== 'object' || canonicalRaw === null || Array.isArray(canonicalRaw)) {
     return { ok: false, error: 'canonical must be an object.' }
   }
-  const canonical: Record<string, CanonicalRule> = {}
+  const canonical: Record<string, CanonicalRule> = Object.create(null)
   for (const [domain, ruleRaw] of Object.entries(canonicalRaw as Record<string, unknown>)) {
+    if (domain === '__proto__' || domain === 'constructor' || domain === 'prototype') {
+      return { ok: false, error: `"${domain}" is a reserved key and cannot be a rule domain.` }
+    }
     if (typeof ruleRaw !== 'object' || ruleRaw === null || Array.isArray(ruleRaw)) {
       return { ok: false, error: `rule for ${domain} must be an object.` }
     }
