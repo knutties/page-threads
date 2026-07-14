@@ -5,6 +5,7 @@
   "description": "Zulip-backed discussion threads for any web page",
   "action": { "default_title": "PageThreads" },
   "side_panel": { "default_path": "src/panel/index.html" },
+  "options_page": "src/options/index.html",
   "permissions": ["sidePanel", "storage"],
   "host_permissions": ["<all_urls>"],
   "background": { "service_worker": "background.js", "type": "module" },
