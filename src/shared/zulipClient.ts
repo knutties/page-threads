@@ -165,6 +165,21 @@ export class ZulipClient {
     return data.messages
   }
 
+  async getUnreadCount(channel: string, topic: string): Promise<number> {
+    const data = await this.request<GetMessagesResponse>('GET', '/messages', {
+      anchor: 'newest',
+      num_before: 1000,
+      num_after: 0,
+      apply_markdown: false,
+      narrow: [
+        { operator: 'channel', operand: channel },
+        { operator: 'topic', operand: topic },
+        { operator: 'is', operand: 'unread' },
+      ],
+    })
+    return data.messages.length
+  }
+
   async sendMessage(channel: string, topic: string, content: string): Promise<number> {
     const data = await this.request<SendMessageResponse>('POST', '/messages', {
       type: 'stream',
