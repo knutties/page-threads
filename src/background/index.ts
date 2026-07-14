@@ -1,6 +1,9 @@
-import { createCredentialsStore } from '../shared/credentials'
+import { createCredentialsStore, type Credentials } from '../shared/credentials'
 import type { PageEntity, PanelToSw, RuntimeToSw, SwToContent, SwToPanel } from '../shared/messages'
+import { matchTopicByKey, topicKey as deriveTopicKey } from '../shared/topic'
+import { createUnreadStore } from '../shared/unread'
 import { ZulipClient } from '../shared/zulipClient'
+import { createBadgeManager, type ResolvedTopic } from './badgeManager'
 import { EventLoop } from './eventLoop'
 import { createLifecycle } from './lifecycle'
 
@@ -10,6 +13,73 @@ const tabEntities = new Map<number, PageEntity>()
 const ports = new Set<chrome.runtime.Port>()
 const credentialsStore = createCredentialsStore()
 
+// Badge plumbing. Credentials mirror (the lifecycle owns its own copy privately;
+// the badge needs a client too). streamId/topics are cached to bound realm chatter.
+// Placed above `lifecycle` (rather than after its setup, as in the brief) because
+// `lifecycle`'s makeLoop onEvent closure references `badge` — defining `badge` first
+// avoids a use-before-declaration lint error for what is otherwise a same-module
+// forward reference safe at runtime.
+let badgeCreds: Credentials | null = null
+let cachedStreamId: number | null = null
+let cachedTopics: { names: string[]; at: number } | null = null
+
+async function loadTopics(client: ZulipClient, channel: string): Promise<string[]> {
+  if (cachedTopics && Date.now() - cachedTopics.at < 60_000) return cachedTopics.names
+  if (cachedStreamId == null) cachedStreamId = await client.getStreamId(channel)
+  const names = await client.getTopics(cachedStreamId)
+  cachedTopics = { names, at: Date.now() }
+  return names
+}
+
+const unreadStore = createUnreadStore()
+
+const badge = createBadgeManager({
+  resolveTopic: async (entityUri): Promise<ResolvedTopic | null> => {
+    if (!badgeCreds) return null
+    try {
+      const client = new ZulipClient(badgeCreds)
+      const key = await deriveTopicKey(entityUri)
+      const names = await loadTopics(client, badgeCreds.channelName)
+      return { topicKey: key, topicName: matchTopicByKey(names, key) }
+    } catch {
+      return null
+    }
+  },
+  computeCount: (topicName) =>
+    badgeCreds ? new ZulipClient(badgeCreds).getUnreadCount(badgeCreds.channelName, topicName) : Promise.resolve(0),
+  setBadge: (tabId, text) => {
+    void chrome.action.setBadgeText({ tabId, text }).catch(() => {})
+  },
+  onChange: (map) => {
+    void unreadStore.save(map).catch(() => {})
+  },
+})
+
+void unreadStore.load().then((m) => badge.seed(m))
+void credentialsStore.load().then((c) => {
+  badgeCreds = c
+  cachedStreamId = null
+  cachedTopics = null
+})
+credentialsStore.watch((c) => {
+  badgeCreds = c
+  cachedStreamId = null // realm may have changed
+  cachedTopics = null
+})
+
+async function refreshActiveTabBadge(): Promise<void> {
+  const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true })
+  if (tab?.id == null) return
+  badge.setActiveTab(tab.id)
+  const entity = await entityForTab(tab.id)
+  await badge.refreshTab(tab.id, entity?.entityUri ?? null)
+}
+
+chrome.alarms.create('badge', { periodInMinutes: 2 })
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === 'badge') void refreshActiveTabBadge()
+})
+
 const lifecycle = createLifecycle({
   loadCredentials: () => credentialsStore.load(),
   makeLoop: (creds) =>
@@ -17,6 +87,7 @@ const lifecycle = createLifecycle({
       onEvent: (event) => {
         if (event.type === 'message' && event.message) {
           broadcast({ type: 'newMessage', topic: event.message.subject, message: event.message })
+          badge.onMessageEvent(event.message.subject, event.message.sender_email === creds.email)
         } else if (event.type === 'update_message' && event.message_id != null) {
           if (event.rendered_content != null) {
             broadcast({ type: 'messageUpdated', messageId: event.message_id, renderedContent: event.rendered_content })
@@ -107,7 +178,10 @@ async function pushActiveEntity(): Promise<void> {
   }
 }
 
-chrome.tabs.onActivated.addListener(() => void pushActiveEntity())
+chrome.tabs.onActivated.addListener(() => {
+  void pushActiveEntity()
+  void refreshActiveTabBadge()
+})
 
 chrome.runtime.onMessage.addListener((msg: RuntimeToSw, sender) => {
   if (msg.type === 'pageEntity' && sender.tab?.id != null) {
@@ -118,12 +192,18 @@ chrome.runtime.onMessage.addListener((msg: RuntimeToSw, sender) => {
     if (sender.tab.active) void pushActiveEntity()
   } else if (msg.type === 'credentialsChanged') {
     void lifecycle.reloadCredentials()
+  } else if (msg.type === 'markedRead') {
+    badge.onMarkedRead(msg.topicKey)
+  } else if (msg.type === 'topicResolved' && sender.tab?.id != null) {
+    // Instant badge for the tab whose panel just resolved a thread.
+    void badge.refreshTab(sender.tab.id, /* re-resolve via entity */ tabEntities.get(sender.tab.id)?.entityUri ?? null)
   }
 })
 
 chrome.tabs.onRemoved.addListener((tabId) => {
   tabEntities.delete(tabId)
   void pushActiveEntity()
+  void chrome.action.setBadgeText({ tabId, text: '' }).catch(() => {})
 })
 
 chrome.windows.onFocusChanged.addListener((windowId) => {
