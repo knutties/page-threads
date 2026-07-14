@@ -5,6 +5,7 @@ import { createNavWatcher } from './navWatcher'
 
 const rulesetStore = createRulesetStore()
 let ruleset: Ruleset = { canonical: {}, blocked: [] }
+let loaded = false
 
 function pageDomain(): string {
   return location.hostname
@@ -23,6 +24,7 @@ function report(entityUri: string): void {
 }
 
 function resolveAndReport(): void {
+  if (!loaded) return // fail closed: don't report until the blocklist is known
   // Blocked domains: send nothing, so the SW never learns the page (spec §7).
   if (isBlocked(pageDomain(), ruleset.blocked)) return
   report(resolveUri())
@@ -31,13 +33,14 @@ function resolveAndReport(): void {
 const watcher = createNavWatcher({
   resolve: () => (isBlocked(pageDomain(), ruleset.blocked) ? 'blocked:' + pageDomain() : resolveUri()),
   onChange: (uri) => {
-    if (!uri.startsWith('blocked:')) report(uri)
+    if (loaded && !uri.startsWith('blocked:')) report(uri)
   },
 })
 
 // Ruleset governs canonicalization AND blocking; load it before the first report.
 void rulesetStore.load().then((rs) => {
   ruleset = rs
+  loaded = true
   watcher.seed(isBlocked(pageDomain(), rs.blocked) ? 'blocked:' + pageDomain() : resolveUri())
   resolveAndReport()
 })
@@ -76,7 +79,7 @@ if (navigation) {
 // re-query this tab. A blocked domain returns nothing usable.
 chrome.runtime.onMessage.addListener((msg: SwToContent, _sender, sendResponse) => {
   if (msg.type === 'queryEntity') {
-    if (isBlocked(pageDomain(), ruleset.blocked)) {
+    if (!loaded || isBlocked(pageDomain(), ruleset.blocked)) {
       sendResponse(null)
     } else {
       sendResponse({ entityUri: resolveUri(), title: document.title })
