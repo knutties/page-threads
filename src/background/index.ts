@@ -194,11 +194,12 @@ chrome.runtime.onMessage.addListener((msg: RuntimeToSw, sender) => {
     void lifecycle.reloadCredentials()
   } else if (msg.type === 'markedRead') {
     badge.onMarkedRead(msg.topicKey)
-  } else if (msg.type === 'topicResolved' && sender.tab?.id != null) {
-    // Instant badge for the tab whose panel just resolved a thread: use the
-    // panel-supplied topicName directly rather than the SW's 60s topics cache,
-    // which wouldn't yet contain a brand-new topic.
-    void badge.refreshResolved(sender.tab.id, msg.topicKey, msg.topicName)
+  } else if (msg.type === 'topicResolved') {
+    // The side panel is an extension page, so sender.tab is undefined. The panel
+    // is window-scoped and only resolves the active tab's thread, so badge that tab.
+    void chrome.tabs.query({ active: true, lastFocusedWindow: true }).then(([tab]) => {
+      if (tab?.id != null) void badge.refreshResolved(tab.id, msg.topicKey, msg.topicName)
+    })
   }
 })
 
