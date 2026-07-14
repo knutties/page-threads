@@ -86,4 +86,44 @@ describe('createReadMarker', () => {
     await vi.advanceTimersByTimeAsync(5000)
     expect(flushed).toEqual([[1]])
   })
+
+  test('drops a batch after maxRetries consecutive failures', async () => {
+    let attempts = 0
+    const flushed: number[][] = []
+    const m = createReadMarker({
+      flush: async (ids) => {
+        attempts++
+        throw new Error('offline')
+        flushed.push(ids)
+      },
+      maxRetries: 3,
+    })
+    m.noteRendered([1])
+    for (let i = 0; i < 5; i++) await vi.advanceTimersByTimeAsync(2000)
+    // 1 initial + 3 retries = 4 attempts, then the batch is dropped (no more retries)
+    expect(attempts).toBe(4)
+    expect(flushed).toEqual([])
+  })
+
+  test('a success resets the failure counter', async () => {
+    let fail = true
+    let attempts = 0
+    const m = createReadMarker({
+      flush: async () => {
+        attempts++
+        if (fail) throw new Error('offline')
+      },
+      maxRetries: 3,
+    })
+    m.noteRendered([1])
+    await vi.advanceTimersByTimeAsync(2000) // attempt 1 fails
+    fail = false
+    m.noteRendered([2])
+    await vi.advanceTimersByTimeAsync(2000) // attempt 2 succeeds ([1,2]) → counter resets
+    fail = true
+    m.noteRendered([3])
+    for (let i = 0; i < 5; i++) await vi.advanceTimersByTimeAsync(2000)
+    // attempt 2 succeeded, so [3] gets a fresh budget: 1 + 3 = 4 failing attempts for it
+    expect(attempts).toBe(1 + 1 + 4)
+  })
 })

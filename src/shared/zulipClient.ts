@@ -27,6 +27,8 @@ export interface ZulipEvent {
   message?: ZulipMessage
   message_id?: number
   rendered_content?: string
+  subject?: string
+  orig_subject?: string
   op?: 'add' | 'remove'
   emoji_name?: string
   emoji_code?: string

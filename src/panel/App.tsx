@@ -220,6 +220,13 @@ export function App() {
       } else if (msg.type === 'messageDeleted') {
         dispatch({ type: 'remove', id: msg.messageId })
         setEditState((cur) => (cur?.id === msg.messageId ? null : cur))
+      } else if (msg.type === 'messageMoved') {
+        const t = threadRef.current
+        // Removed from THIS thread if it moved to a topic that isn't ours.
+        if (t && !topicMatchesKey(msg.newTopic, t.key)) {
+          dispatch({ type: 'remove', id: msg.messageId })
+          setEditState((cur) => (cur?.id === msg.messageId ? null : cur))
+        }
       } else if (msg.type === 'reactionChanged') {
         dispatch({ type: 'reaction', op: msg.op, id: msg.messageId, reaction: msg.reaction })
       } else if (msg.type === 'reconnected') {
