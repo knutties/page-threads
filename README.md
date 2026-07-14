@@ -2,7 +2,7 @@
 
 A Manifest V3 browser extension that attaches a live discussion thread to any web
 page, using a Zulip realm as the backend. Spec: [WHAT.md](WHAT.md). Current state:
-**M1d-2** (canonicalization rules, domain block-list, options page; see docs/superpowers/specs/).
+**M1d-3 / M1 complete** (unread badge; live + polled; see docs/superpowers/specs/).
 
 ## Build
 
@@ -112,3 +112,13 @@ are stored in extension storage; use the ⚙️ menu to sign out.
 - [ ] Export produces JSON of the current ruleset; Import of that JSON round-trips; Import of malformed JSON shows an error and changes nothing.
 - [ ] (If you use Chrome sign-in across profiles) a rule added in one profile appears in another — rules live in storage.sync.
 - [ ] Strict privacy still gates correctly (the gate now waits for settings to load before resolving).
+
+## M1d-3 acceptance checklist
+
+- [ ] Background a page's tab (open its panel once so a thread exists), post to its topic from the Zulip web UI → the toolbar badge shows the unread count within ~2 min (instantly if a panel is open).
+- [ ] Open the panel and read the thread → the badge drops to `•`.
+- [ ] A page with no discussion shows no badge; a blocked domain shows no badge.
+- [ ] Your own message posted from the panel does not increment the badge.
+- [ ] Two tabs with different unread each show their own badge when active.
+- [ ] Idle the service worker (chrome://extensions shows it inactive after ~30s), then click the tab → the badge recomputes from Zulip (survives SW restart).
+- [ ] Badge count caps at `99+`.
