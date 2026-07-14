@@ -71,4 +71,13 @@ describe('RulesEditor', () => {
     const out = (await screen.findByLabelText('exported ruleset')) as HTMLTextAreaElement
     expect(JSON.parse(out.value)).toEqual({ canonical: { 'x.com': { keepParams: ['id'] } }, blocked: ['a.com'] })
   })
+
+  test('shows a Saved confirmation after a change persists', async () => {
+    const store = fakeStore({ canonical: {}, blocked: [] })
+    render(<RulesEditor store={store} />)
+    await screen.findByText('Blocked domains')
+    fireEvent.input(screen.getByPlaceholderText('add blocked domain'), { target: { value: 'a.com' } })
+    fireEvent.click(screen.getByText('Block'))
+    expect(await screen.findByText('Saved ✓')).toBeTruthy()
+  })
 })

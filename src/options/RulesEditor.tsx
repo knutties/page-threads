@@ -11,6 +11,7 @@ export function RulesEditor({ store = createRulesetStore() }: { store?: Store<Ru
   const [importText, setImportText] = useState('')
   const [exported, setExported] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [saved, setSaved] = useState(false)
 
   useEffect(() => {
     void store.load().then((r) => {
@@ -26,6 +27,8 @@ export function RulesEditor({ store = createRulesetStore() }: { store?: Store<Ru
     setRuleset(next)
     try {
       await store.save(next)
+      setSaved(true)
+      window.setTimeout(() => setSaved(false), 1500)
     } catch {
       setRuleset(prev)
       setError('Could not save — try again.')
@@ -37,6 +40,8 @@ export function RulesEditor({ store = createRulesetStore() }: { store?: Store<Ru
     setRuleset(next)
     try {
       await store.save(next)
+      setSaved(true)
+      window.setTimeout(() => setSaved(false), 1500)
     } catch {
       setRuleset(prev)
       setError('Could not save — try again.')
@@ -66,6 +71,7 @@ export function RulesEditor({ store = createRulesetStore() }: { store?: Store<Ru
   return (
     <div class="rules-editor">
       {error && <div class="error" role="alert" onClick={() => setError(null)}>{error}</div>}
+      {saved && <div class="saved" role="status">Saved ✓</div>}
 
       <section>
         <h2>Canonicalization rules</h2>

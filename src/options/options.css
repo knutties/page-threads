@@ -17,3 +17,4 @@ body { margin: 0; }
 .blocked-row span { flex: 1; }
 .io textarea { flex: 1 1 100%; font-family: ui-monospace, monospace; font-size: 12px; }
 .rules-editor .error { background: #fdecea; color: #b3261e; padding: 8px; cursor: pointer; }
+.rules-editor .saved { color: #1a7f37; font-size: 13px; margin: 4px 0; }
