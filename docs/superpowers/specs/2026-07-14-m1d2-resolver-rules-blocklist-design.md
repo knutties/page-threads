@@ -19,6 +19,12 @@ In:
 
 Out (deferred, documented): resolver versioning/migration (§4.5 — M2); tool-specific Tier-1/Tier-2 resolvers (Jira/GitHub/etc — Appendix A, later); messageMoved inbound/cross-channel; sanitizer colspan/rowspan; unread badge (M1d-3).
 
+### Inherent limitation: client-side rules can split threads
+
+Canonicalization runs entirely in the browser (there is no server; Zulip only stores the resulting topics — see WHAT.md §1). Consequently, per-domain rules are **per-user**: if user A has a `keepParams` rule for a domain that user B lacks, the two can canonicalize the same page to different `entityUri`s and therefore land in *different* topics — a silently split discussion. `storage.sync` roams a rule across one user's own Chrome profiles but does **not** share it across users. This is an accepted M1 limitation, mitigated today by (a) the built-in defaults being identical for everyone and (b) rules being an opt-in power-user feature most users never touch.
+
+The durable fix is a shared, authoritative resolver service (a thin, optional, non-authoritative backend — Zulip stays the system of record; this is the same external-consumer shape Appendix B reserves for the knowledge index). Building it now is premature: the product ships client-only, and the *frequency of real-world thread-split from rule divergence* is the concrete signal that would justify the investment. Until that signal appears, rules stay client-side and this limitation is documented rather than engineered away.
+
 ## Design
 
 ### Ruleset store (`src/shared/ruleset.ts`)
