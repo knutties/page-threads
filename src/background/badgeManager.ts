@@ -35,8 +35,11 @@ export function createBadgeManager(deps: {
       map = { ...initial }
     },
     setActiveTab(tabId: number | null): void {
+      // activeTopicKey belongs to whichever tab was last active; it is unknown for
+      // a newly-active tab until refreshTab resolves it, so clear it on any change
+      // to prevent a stale topic's event from repainting the wrong tab's badge.
       activeTabId = tabId
-      if (tabId == null) activeTopicKey = null
+      activeTopicKey = null
     },
     async refreshTab(tabId: number, entityUri: string | null): Promise<void> {
       if (entityUri == null) {

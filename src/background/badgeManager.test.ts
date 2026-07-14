@@ -90,4 +90,21 @@ describe('badgeManager events', () => {
     mgr.onMessageEvent(NAME, false)
     expect(persisted.at(-1)![KEY]).toBe(6)
   })
+
+  test('switching active tabs does not let an old-tab event repaint the new tab', async () => {
+    const badges: Array<[number, string]> = []
+    const mgr = createBadgeManager({
+      resolveTopic: async () => ({ topicKey: KEY, topicName: NAME }),
+      computeCount: async () => 0,
+      setBadge: (tabId, text) => badges.push([tabId, text]),
+      onChange: () => {},
+    })
+    mgr.setActiveTab(1)
+    await mgr.refreshTab(1, 'web:a') // activeTopicKey = KEY for tab 1
+    mgr.setActiveTab(2) // switch to tab 2 (its topic not yet resolved)
+    badges.length = 0
+    mgr.onMessageEvent(NAME, false) // event for tab 1's topic
+    // tab 2's badge must NOT be painted with tab 1's topic count
+    expect(badges).toEqual([])
+  })
 })
