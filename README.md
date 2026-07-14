@@ -2,7 +2,7 @@
 
 A Manifest V3 browser extension that attaches a live discussion thread to any web
 page, using a Zulip realm as the backend. Spec: [WHAT.md](WHAT.md). Current state:
-**M1d-1** (options page, strict-privacy mode, hardening; see docs/superpowers/specs/).
+**M1d-2** (canonicalization rules, domain block-list, options page; see docs/superpowers/specs/).
 
 ## Build
 
@@ -103,3 +103,12 @@ are stored in extension storage; use the ⚙️ menu to sign out.
 - [ ] Toggling "keep the last thread on non-web pages" changes panel behavior on a chrome:// tab live.
 - [ ] Moving a message to a different topic in the Zulip web UI removes it from the open panel thread.
 - [ ] A message with markup renders unchanged (per-tag attribute hardening is invisible to normal content).
+
+## M1d-2 acceptance checklist
+
+- [ ] Options → Canonicalization rules: add `news.ycombinator.com` with keepParams `id`. Open an HN item URL with extra params (e.g. `?id=123&utm_source=x`) and the clean `?id=123` URL — both resolve to the same thread.
+- [ ] Add a `pathRewrite` rule (e.g. youtube.com → `/watch`, keepParams `v`) and confirm a `/watch?v=…&list=…` URL keys on `/watch?v=…`.
+- [ ] Blocked domains: add a domain; open a page there → panel shows the no-page state and DevTools Network shows no request to the realm; the SW never learns the page. Unblock → resolution returns (may need a reload/navigation).
+- [ ] Export produces JSON of the current ruleset; Import of that JSON round-trips; Import of malformed JSON shows an error and changes nothing.
+- [ ] (If you use Chrome sign-in across profiles) a rule added in one profile appears in another — rules live in storage.sync.
+- [ ] Strict privacy still gates correctly (the gate now waits for settings to load before resolving).
