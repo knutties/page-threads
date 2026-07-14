@@ -1,7 +1,16 @@
 import { useEffect, useState } from 'preact/hooks'
+import type { Ruleset } from '../shared/ruleset'
 import { createSettingsStore, DEFAULT_SETTINGS, type Settings, type SettingsStore } from '../shared/settings'
+import type { Store } from '../shared/storage'
+import { RulesEditor } from './RulesEditor'
 
-export function OptionsView({ store = createSettingsStore() }: { store?: SettingsStore }) {
+export function OptionsView({
+  store = createSettingsStore(),
+  rulesStore,
+}: {
+  store?: SettingsStore
+  rulesStore?: Store<Ruleset>
+}) {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS)
   const [loaded, setLoaded] = useState(false)
 
@@ -55,6 +64,8 @@ export function OptionsView({ store = createSettingsStore() }: { store?: Setting
         </label>
         <p class="hint">When off, the panel clears and disables the composer on non-web pages.</p>
       </section>
+
+      <RulesEditor store={rulesStore} />
     </div>
   )
 }

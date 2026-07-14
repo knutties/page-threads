@@ -7,3 +7,12 @@ body { margin: 0; }
 .options label { display: flex; gap: 8px; align-items: flex-start; font-weight: 600; }
 .options .hint { margin: 4px 0 0 24px; color: #666; font-weight: 400; }
 .loading { padding: 24px; color: #777; }
+
+.rules-editor section { margin: 24px 0; }
+.rules-editor h2 { font-size: 16px; margin-bottom: 4px; }
+.rule-row, .blocked-row, .rule-add, .io { display: flex; gap: 8px; align-items: center; margin: 6px 0; flex-wrap: wrap; }
+.rule-row input { flex: 1 1 140px; padding: 4px; }
+.rule-row input[readonly] { background: #f0f0f0; }
+.blocked-row span { flex: 1; }
+.io textarea { flex: 1 1 100%; font-family: ui-monospace, monospace; font-size: 12px; }
+.rules-editor .error { background: #fdecea; color: #b3261e; padding: 8px; cursor: pointer; }

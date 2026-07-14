@@ -1,0 +1,74 @@
+// @vitest-environment jsdom
+import { fireEvent, render, screen, waitFor } from '@testing-library/preact'
+import { describe, expect, test } from 'vitest'
+import type { Ruleset } from '../shared/ruleset'
+import type { Store } from '../shared/storage'
+import { RulesEditor } from './RulesEditor'
+
+function fakeStore(initial: Ruleset): Store<Ruleset> & { current: Ruleset } {
+  const s = {
+    current: { ...initial },
+    load: async () => s.current,
+    save: async (patch: Partial<Ruleset>) => {
+      s.current = { ...s.current, ...patch }
+    },
+    watch: () => () => {},
+  }
+  return s as Store<Ruleset> & { current: Ruleset }
+}
+
+describe('RulesEditor', () => {
+  test('renders existing domain rows', async () => {
+    const store = fakeStore({ canonical: { 'news.ycombinator.com': { keepParams: ['id'] } }, blocked: [] })
+    render(<RulesEditor store={store} />)
+    expect(await screen.findByDisplayValue('news.ycombinator.com')).toBeTruthy()
+    expect(screen.getByDisplayValue('id')).toBeTruthy()
+  })
+
+  test('adding a domain writes through the store', async () => {
+    const store = fakeStore({ canonical: {}, blocked: [] })
+    render(<RulesEditor store={store} />)
+    await screen.findByText('Canonicalization rules')
+    fireEvent.input(screen.getByPlaceholderText('add domain, e.g. news.ycombinator.com'), {
+      target: { value: 'x.com' },
+    })
+    fireEvent.click(screen.getByText('Add domain'))
+    await waitFor(() => expect(store.current.canonical['x.com']).toEqual({}))
+  })
+
+  test('editing keepParams writes a parsed array', async () => {
+    const store = fakeStore({ canonical: { 'x.com': {} }, blocked: [] })
+    render(<RulesEditor store={store} />)
+    const kp = (await screen.findByPlaceholderText('keepParams (comma-separated)')) as HTMLInputElement
+    fireEvent.input(kp, { target: { value: 'id, v' } })
+    fireEvent.blur(kp)
+    await waitFor(() => expect(store.current.canonical['x.com'].keepParams).toEqual(['id', 'v']))
+  })
+
+  test('blocking a domain writes through the store', async () => {
+    const store = fakeStore({ canonical: {}, blocked: [] })
+    render(<RulesEditor store={store} />)
+    await screen.findByText('Blocked domains')
+    fireEvent.input(screen.getByPlaceholderText('add blocked domain'), { target: { value: 'bank.com' } })
+    fireEvent.click(screen.getByText('Block'))
+    await waitFor(() => expect(store.current.blocked).toContain('bank.com'))
+  })
+
+  test('import rejects invalid JSON with a visible message and does not change state', async () => {
+    const store = fakeStore({ canonical: {}, blocked: [] })
+    render(<RulesEditor store={store} />)
+    const ta = (await screen.findByPlaceholderText('paste ruleset JSON to import')) as HTMLTextAreaElement
+    fireEvent.input(ta, { target: { value: '{ not json' } })
+    fireEvent.click(screen.getByText('Import'))
+    expect(await screen.findByText(/Invalid JSON/i)).toBeTruthy()
+    expect(store.current.canonical).toEqual({})
+  })
+
+  test('export reflects current rules as JSON', async () => {
+    const store = fakeStore({ canonical: { 'x.com': { keepParams: ['id'] } }, blocked: ['a.com'] })
+    render(<RulesEditor store={store} />)
+    fireEvent.click(await screen.findByText('Export'))
+    const out = (await screen.findByLabelText('exported ruleset')) as HTMLTextAreaElement
+    expect(JSON.parse(out.value)).toEqual({ canonical: { 'x.com': { keepParams: ['id'] } }, blocked: ['a.com'] })
+  })
+})
