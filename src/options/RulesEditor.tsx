@@ -117,7 +117,7 @@ export function RulesEditor({ store = createRulesetStore() }: { store?: Store<Ru
 
       <section>
         <h2>Blocked domains</h2>
-        <p class="hint">The extension reports nothing on these domains — no page reaches your realm.</p>
+        <p class="hint">The extension stops reporting these domains — no new page reaches your realm. A discussion already open when you block a domain stays until you switch away.</p>
         {ruleset.blocked.map((domain) => (
           <div class="blocked-row" key={domain}>
             <span>{domain}</span>

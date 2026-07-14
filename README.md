@@ -108,7 +108,7 @@ are stored in extension storage; use the ⚙️ menu to sign out.
 
 - [ ] Options → Canonicalization rules: add `news.ycombinator.com` with keepParams `id`. Open an HN item URL with extra params (e.g. `?id=123&utm_source=x`) and the clean `?id=123` URL — both resolve to the same thread.
 - [ ] Add a `pathRewrite` rule (e.g. youtube.com → `/watch`, keepParams `v`) and confirm a `/watch?v=…&list=…` URL keys on `/watch?v=…`.
-- [ ] Blocked domains: add a domain; open a page there → panel shows the no-page state and DevTools Network shows no request to the realm; the SW never learns the page. Unblock → resolution returns (may need a reload/navigation).
+- [ ] Blocked domains: add a domain; open a page there → panel shows the no-page state and DevTools Network shows no request to the realm; the SW never learns the page. Unblock → resolution returns (may need a reload/navigation). Note: blocking is prospective — a thread already resolved before you blocked the domain stays visible until you navigate away; blocking prevents NEW resolution/requests.
 - [ ] Export produces JSON of the current ruleset; Import of that JSON round-trips; Import of malformed JSON shows an error and changes nothing.
 - [ ] (If you use Chrome sign-in across profiles) a rule added in one profile appears in another — rules live in storage.sync.
 - [ ] Strict privacy still gates correctly (the gate now waits for settings to load before resolving).

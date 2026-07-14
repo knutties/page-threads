@@ -25,8 +25,13 @@ function report(entityUri: string): void {
 
 function resolveAndReport(): void {
   if (!loaded) return // fail closed: don't report until the blocklist is known
-  // Blocked domains: send nothing, so the SW never learns the page (spec §7).
-  if (isBlocked(pageDomain(), ruleset.blocked)) return
+  if (isBlocked(pageDomain(), ruleset.blocked)) {
+    // Retract any entity the SW cached for this tab before the block took effect,
+    // so a later tab re-activation can't resolve the now-blocked page.
+    const msg: ContentToSw = { type: 'pageBlocked' }
+    void chrome.runtime.sendMessage(msg).catch(() => {})
+    return
+  }
   report(resolveUri())
 }
 

@@ -6,7 +6,7 @@ export interface PageEntity {
 }
 
 /** Content script → service worker, via chrome.runtime.sendMessage. */
-export type ContentToSw = { type: 'pageEntity' } & PageEntity
+export type ContentToSw = ({ type: 'pageEntity' } & PageEntity) | { type: 'pageBlocked' }
 
 /** Anything arriving at the service worker via chrome.runtime.sendMessage. */
 export type RuntimeToSw = ContentToSw | { type: 'credentialsChanged' }
