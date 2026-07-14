@@ -2,8 +2,7 @@
 
 A Manifest V3 browser extension that attaches a live discussion thread to any web
 page, using a Zulip realm as the backend. Spec: [WHAT.md](WHAT.md). Current state:
-**M1c** (live panel, in-panel onboarding, rendered messages with edit/delete/
-reactions/read markers; see docs/superpowers/specs/).
+**M1d-1** (options page, strict-privacy mode, hardening; see docs/superpowers/specs/).
 
 ## Build
 
@@ -94,3 +93,13 @@ are stored in extension storage; use the ⚙️ menu to sign out.
 - [ ] Navigating a tab to chrome://settings while its thread is shown: panel holds (default) without stale re-pushes later.
 - [ ] Reactions from another user appear live (verifies reaction events carry all expected fields).
 - [ ] Deleting a message from the Zulip web UI removes it live in the panel (verifies delete_message event shape on this Zulip version).
+
+## M1d-1 acceptance checklist
+
+- [ ] The options page opens from the panel's ⚙️ → Settings and from chrome://extensions.
+- [ ] Both toggles reflect stored values and take effect in an open panel without reload.
+- [ ] With strict privacy ON: opening the panel on a fresh page shows the page title and a "Check for discussion" button; DevTools Network shows ZERO requests to the realm until it is clicked; clicking resolves the thread.
+- [ ] With strict privacy OFF: the panel auto-resolves as before.
+- [ ] Toggling "keep the last thread on non-web pages" changes panel behavior on a chrome:// tab live.
+- [ ] Moving a message to a different topic in the Zulip web UI removes it from the open panel thread.
+- [ ] A message with markup renders unchanged (per-tag attribute hardening is invisible to normal content).
