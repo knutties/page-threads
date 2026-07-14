@@ -74,7 +74,14 @@ export function App() {
     readMarkerRef.current?.dispose()
     readMarkerRef.current = c
       ? createReadMarker({
-          flush: (ids) => clientRef.current?.markRead(ids) ?? Promise.resolve(),
+          flush: async (ids) => {
+            await (clientRef.current?.markRead(ids) ?? Promise.resolve())
+            const t = threadRef.current
+            if (t) {
+              const msg: RuntimeToSw = { type: 'markedRead', topicKey: t.key }
+              void chrome.runtime.sendMessage(msg).catch(() => {})
+            }
+          },
           isVisible: () => document.visibilityState === 'visible',
         })
       : null
@@ -286,7 +293,11 @@ export function App() {
     const existingTopic = matchTopicByKey(topics, key)
     if (targetRef.current.currentUri !== entity.entityUri) return
     setThread({ entity, key, existingTopic })
-    if (existingTopic) await loadHistory(existingTopic, entity.entityUri)
+    if (existingTopic) {
+      const msg: RuntimeToSw = { type: 'topicResolved', topicKey: key, topicName: existingTopic }
+      void chrome.runtime.sendMessage(msg).catch(() => {})
+      await loadHistory(existingTopic, entity.entityUri)
+    }
   }
 
   async function loadHistory(topic: string, forUri: string) {

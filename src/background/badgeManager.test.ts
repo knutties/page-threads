@@ -91,6 +91,21 @@ describe('badgeManager events', () => {
     expect(persisted.at(-1)![KEY]).toBe(6)
   })
 
+  test('refreshResolved uses the supplied topic name directly (no resolveTopic) and paints', async () => {
+    const badges: Array<[number, string]> = []
+    const calls: string[] = []
+    const mgr = createBadgeManager({
+      resolveTopic: async () => { calls.push('resolve'); return null },
+      computeCount: async (name) => { calls.push('count:' + name); return 3 },
+      setBadge: (tabId, text) => badges.push([tabId, text]),
+      onChange: () => {},
+    })
+    mgr.setActiveTab(9)
+    await mgr.refreshResolved(9, KEY, NAME)
+    expect(calls).toEqual([`count:${NAME}`]) // resolveTopic NOT called
+    expect(badges).toEqual([[9, '3']])
+  })
+
   test('switching active tabs does not let an old-tab event repaint the new tab', async () => {
     const badges: Array<[number, string]> = []
     const mgr = createBadgeManager({

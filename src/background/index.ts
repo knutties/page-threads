@@ -195,8 +195,10 @@ chrome.runtime.onMessage.addListener((msg: RuntimeToSw, sender) => {
   } else if (msg.type === 'markedRead') {
     badge.onMarkedRead(msg.topicKey)
   } else if (msg.type === 'topicResolved' && sender.tab?.id != null) {
-    // Instant badge for the tab whose panel just resolved a thread.
-    void badge.refreshTab(sender.tab.id, /* re-resolve via entity */ tabEntities.get(sender.tab.id)?.entityUri ?? null)
+    // Instant badge for the tab whose panel just resolved a thread: use the
+    // panel-supplied topicName directly rather than the SW's 60s topics cache,
+    // which wouldn't yet contain a brand-new topic.
+    void badge.refreshResolved(sender.tab.id, msg.topicKey, msg.topicName)
   }
 })
 

@@ -62,6 +62,13 @@ export function createBadgeManager(deps: {
       deps.onChange(map)
       deps.setBadge(tabId, badgeText(count, true))
     },
+    async refreshResolved(tabId: number, topicKey: string, topicName: string): Promise<void> {
+      if (tabId === activeTabId) activeTopicKey = topicKey
+      const count = await deps.computeCount(topicName)
+      map = unreadReducer(map, { type: 'set', topicKey, count })
+      deps.onChange(map)
+      deps.setBadge(tabId, badgeText(count, true))
+    },
     onMessageEvent(topicName: string, senderIsSelf: boolean): void {
       if (senderIsSelf) return
       const key = keyFromTopicName(topicName)
