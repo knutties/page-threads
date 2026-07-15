@@ -71,8 +71,14 @@ async function refreshActiveTabBadge(): Promise<void> {
   const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true })
   if (tab?.id == null) return
   badge.setActiveTab(tab.id)
-  const entity = await entityForTab(tab.id)
-  await badge.refreshTab(tab.id, entity?.entityUri ?? null)
+  const lookup = await lookupEntity(tab.id)
+  if (lookup.kind === 'unknown' && tab.url && /^https?:/.test(tab.url)) {
+    // The content script on a real web page is momentarily unreachable — orphaned by an
+    // extension reload, or not yet injected after an SW restart. Leave the current badge
+    // as-is; blanking it would wipe a valid thread's count until the next poll re-resolves.
+    return
+  }
+  await badge.refreshTab(tab.id, lookup.kind === 'entity' ? lookup.entity.entityUri : null)
 }
 
 chrome.alarms.create('badge', { periodInMinutes: 2 })
@@ -142,21 +148,33 @@ function removePort(port: chrome.runtime.Port): void {
   if (ports.delete(port)) lifecycle.portDisconnected()
 }
 
+// Distinguishes "the content script confirmed there's no entity here" (blank the badge)
+// from "the content script was unreachable" (state unknown — don't clobber a valid badge).
+type EntityLookup =
+  | { kind: 'entity'; entity: PageEntity }
+  | { kind: 'none' } // content script answered: no thread (blocked / non-web page)
+  | { kind: 'unknown' } // no reachable content script (chrome:// page, or orphaned after reload)
+
 /** tabEntities is a cache; on a miss (SW restarted since the page loaded), ask the tab. */
-async function entityForTab(tabId: number): Promise<PageEntity | null> {
+async function lookupEntity(tabId: number): Promise<EntityLookup> {
   const cached = tabEntities.get(tabId)
-  if (cached) return cached
+  if (cached) return { kind: 'entity', entity: cached }
   try {
     const msg: SwToContent = { type: 'queryEntity' }
     const entity = (await chrome.tabs.sendMessage(tabId, msg)) as PageEntity | undefined
     if (entity) {
       tabEntities.set(tabId, entity)
-      return entity
+      return { kind: 'entity', entity }
     }
+    return { kind: 'none' } // content script is present and reports no entity
   } catch {
-    // No content script in this tab: chrome:// page, or orphaned script after an extension reload.
+    return { kind: 'unknown' } // sendMessage threw: no reachable content script
   }
-  return null
+}
+
+async function entityForTab(tabId: number): Promise<PageEntity | null> {
+  const r = await lookupEntity(tabId)
+  return r.kind === 'entity' ? r.entity : null
 }
 
 let lastPushedUri: string | null | undefined // undefined = nothing pushed yet

@@ -49,7 +49,9 @@ export function createBadgeManager(deps: {
       }
       const resolved = await deps.resolveTopic(entityUri)
       if (!resolved) {
-        deps.setBadge(tabId, '')
+        // Transient failure (creds not loaded yet on a cold-start poll, or a network
+        // error) — never a confirmed "no thread". Leave the current badge as-is rather
+        // than blanking a valid count; the next poll re-resolves it.
         return
       }
       if (tabId === activeTabId) activeTopicKey = resolved.topicKey

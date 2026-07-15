@@ -49,10 +49,13 @@ describe('badgeManager.refreshTab', () => {
     expect(badges).toEqual([[7, '•']])
   })
 
-  test('unresolvable (null) → empty badge', async () => {
+  test('unresolvable (null, transient) → badge left unchanged, not blanked', async () => {
+    // resolveTopic returns null only on a transient failure (no creds loaded yet, network
+    // error) — never "confirmed no thread". Blanking here would wipe a valid count on a
+    // cold-start poll; the next successful poll re-resolves it.
     const { mgr, badges } = setup({ resolveTopic: async () => null })
     await mgr.refreshTab(7, 'web:x')
-    expect(badges).toEqual([[7, '']])
+    expect(badges).toEqual([])
   })
 })
 
