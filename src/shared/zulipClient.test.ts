@@ -274,4 +274,30 @@ describe('message features endpoints', () => {
       userId: 17,
     })
   })
+
+  describe('unread count', () => {
+    test('getUnreadCount narrows on channel+topic+is:unread and returns the message count', async () => {
+      const calls: Array<{ url: string }> = []
+      const fn = (async (url: any) => {
+        calls.push({ url: String(url) })
+        return new Response(JSON.stringify({ result: 'success', messages: [{ id: 1 }, { id: 2 }, { id: 3 }] }))
+      }) as typeof fetch
+      const n = await new ZulipClient(cfg, fn).getUnreadCount('web-threads', 'T · k')
+      expect(n).toBe(3)
+      const url = new URL(calls[0].url)
+      expect(url.pathname).toBe('/api/v1/messages')
+      expect(url.searchParams.get('anchor')).toBe('newest')
+      expect(url.searchParams.get('num_after')).toBe('0')
+      expect(JSON.parse(url.searchParams.get('narrow')!)).toEqual([
+        { operator: 'channel', operand: 'web-threads' },
+        { operator: 'topic', operand: 'T · k' },
+        { operator: 'is', operand: 'unread' },
+      ])
+    })
+
+    test('getUnreadCount returns 0 for an empty result', async () => {
+      const fn = (async () => new Response(JSON.stringify({ result: 'success', messages: [] }))) as typeof fetch
+      expect(await new ZulipClient(cfg, fn).getUnreadCount('web-threads', 'T · k')).toBe(0)
+    })
+  })
 })

@@ -9,7 +9,11 @@ export interface PageEntity {
 export type ContentToSw = ({ type: 'pageEntity' } & PageEntity) | { type: 'pageBlocked' }
 
 /** Anything arriving at the service worker via chrome.runtime.sendMessage. */
-export type RuntimeToSw = ContentToSw | { type: 'credentialsChanged' }
+export type RuntimeToSw =
+  | ContentToSw
+  | { type: 'credentialsChanged' }
+  | { type: 'markedRead'; topicKey: string }
+  | { type: 'topicResolved'; topicKey: string; topicName: string }
 
 /** Service worker → content script, via chrome.tabs.sendMessage. */
 export type SwToContent = { type: 'queryEntity' }
