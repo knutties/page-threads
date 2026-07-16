@@ -8,6 +8,7 @@ import { AccountView } from './AccountView'
 import { Composer } from './Composer'
 import { Drafts } from './drafts'
 import { topicMatchesKey } from './eventMatch'
+import { headerSubtitle } from './headerSubtitle'
 import type { ReactionInput } from './MessageView'
 import { panelTarget, type PanelTargetState } from './panelTarget'
 import { createReadMarker, type ReadMarker } from './readMarker'
@@ -432,7 +433,10 @@ export function App() {
   return (
     <div class="app">
       <header title={thread?.entity.entityUri}>
-        <span class="title">{thread ? thread.entity.title : 'PageThreads'}</span>
+        <div class="header-text">
+          <span class="title">{thread ? thread.entity.title : 'PageThreads'}</span>
+          {thread && <span class="subtitle">{headerSubtitle(thread.entity.entityUri, messages.length)}</span>}
+        </div>
         <button
           class={pinned ? 'pin pinned' : 'pin'}
           title={pinned ? 'Unpin: follow the active tab' : 'Pin: keep this thread while browsing'}
