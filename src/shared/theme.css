@@ -1,0 +1,49 @@
+/* PageThreads design tokens — Aubergine (light) default + Dark override.
+   Every panel/options color references a --pt-* var; no hardcoded hex lives
+   outside this file. */
+:root {
+  color-scheme: light;
+  --pt-header-bg: #3f0e40;
+  --pt-header-ink: #ffffff;
+  --pt-body-bg: #ffffff;
+  --pt-ink: #1d1c1d;
+  --pt-muted: #616061;
+  --pt-line: #e6e6e6;
+  --pt-hover: #f7f6f7;
+  --pt-accent: #611f69;
+  --pt-send: #007a5a;
+  --pt-link: #1264a3;
+  --pt-pill-bg: #f6f6f6;
+  --pt-mine-bg: #e8f5fa;
+  --pt-mine-bd: #1264a3;
+  --pt-mine-ink: #0b5394;
+  --pt-code-bg: #f4eef4;
+  --pt-code-ink: #772f7a;
+  --pt-mention-bg: #ede1f0;
+  --pt-error-bg: #fdecea;
+  --pt-error-ink: #b3261e;
+  --pt-danger: #b3261e;
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --pt-header-bg: #1a1d21;
+  --pt-header-ink: #e9eaeb;
+  --pt-body-bg: #1a1d21;
+  --pt-ink: #d5d6d7;
+  --pt-muted: #9a9b9d;
+  --pt-line: #34373b;
+  --pt-hover: #232629;
+  --pt-accent: #c99be0;
+  --pt-send: #007a5a;
+  --pt-link: #4ea1e8;
+  --pt-pill-bg: #26292d;
+  --pt-mine-bg: rgba(29, 155, 209, 0.18);
+  --pt-mine-bd: #2a6f97;
+  --pt-mine-ink: #79c0e8;
+  --pt-code-bg: #2b2f33;
+  --pt-code-ink: #e6b8e0;
+  --pt-mention-bg: rgba(201, 155, 224, 0.16);
+  --pt-error-bg: #3a2422;
+  --pt-error-ink: #f2b8b5;
+  --pt-danger: #f2b8b5;
+}
