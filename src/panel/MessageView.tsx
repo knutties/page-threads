@@ -101,22 +101,6 @@ export function MessageView({
           <span class="time">
             {new Date(message.timestamp * 1000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
           </span>
-          {own && !edit && (
-            <span class="msg-actions">
-              <button title="Edit" disabled={busy} onClick={onStartEdit}>
-                ✎
-              </button>
-              {confirmingDelete ? (
-                <button title="Confirm delete" class="danger" disabled={busy} onClick={onDelete}>
-                  Delete?
-                </button>
-              ) : (
-                <button title="Delete" disabled={busy} onClick={() => setConfirmingDelete(true)}>
-                  🗑
-                </button>
-              )}
-            </span>
-          )}
         </div>
         {edit ? (
           <div class="msg-editor">
@@ -137,44 +121,65 @@ export function MessageView({
             dangerouslySetInnerHTML={{ __html: sanitizeMessageHtml(message.content, realmUrl) }}
           />
         )}
-        <div class="reactions">
-          {groups.map((g) => (
-            <button
-              key={`${g.reaction.reaction_type}:${g.reaction.emoji_code}`}
-              class={g.mine ? 'reaction-chip mine' : 'reaction-chip'}
-              disabled={busy}
-              onClick={() =>
-                onToggleReaction({
-                  emoji_name: g.reaction.emoji_name,
-                  emoji_code: g.reaction.emoji_code,
-                  reaction_type: g.reaction.reaction_type,
-                })
-              }
-            >
-              {emojiFromCode(g.reaction.emoji_code)} {g.count}
-            </button>
-          ))}
-          <button title="Add reaction" class="reaction-add" disabled={busy} onClick={() => setPicking(!picking)}>
-            +
-          </button>
-          {picking && (
-            <span class="quick-reactions">
-              {QUICK_REACTIONS.map((q) => (
-                <button
-                  key={q.emoji_code}
-                  disabled={busy}
-                  onClick={() => {
-                    setPicking(false)
-                    onToggleReaction({ emoji_name: q.emoji_name, emoji_code: q.emoji_code, reaction_type: 'unicode_emoji' })
-                  }}
-                >
-                  {q.rendered}
-                </button>
-              ))}
-            </span>
-          )}
-        </div>
+        {groups.length > 0 && (
+          <div class="reactions">
+            {groups.map((g) => (
+              <button
+                key={`${g.reaction.reaction_type}:${g.reaction.emoji_code}`}
+                class={g.mine ? 'reaction-chip mine' : 'reaction-chip'}
+                disabled={busy}
+                onClick={() =>
+                  onToggleReaction({
+                    emoji_name: g.reaction.emoji_name,
+                    emoji_code: g.reaction.emoji_code,
+                    reaction_type: g.reaction.reaction_type,
+                  })
+                }
+              >
+                {emojiFromCode(g.reaction.emoji_code)} {g.count}
+              </button>
+            ))}
+          </div>
+        )}
+        {picking && (
+          <div class="quick-reactions">
+            {QUICK_REACTIONS.map((q) => (
+              <button
+                key={q.emoji_code}
+                disabled={busy}
+                onClick={() => {
+                  setPicking(false)
+                  onToggleReaction({ emoji_name: q.emoji_name, emoji_code: q.emoji_code, reaction_type: 'unicode_emoji' })
+                }}
+              >
+                {q.rendered}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
+      {!edit && (
+        <div class={picking || confirmingDelete ? 'hover-actions shown' : 'hover-actions'}>
+          <button title="Add reaction" class="react-btn" disabled={busy} onClick={() => setPicking(!picking)}>
+            😀
+          </button>
+          {own && (
+            <button title="Edit" disabled={busy} onClick={onStartEdit}>
+              ✎
+            </button>
+          )}
+          {own &&
+            (confirmingDelete ? (
+              <button title="Confirm delete" class="danger" disabled={busy} onClick={onDelete}>
+                Delete?
+              </button>
+            ) : (
+              <button title="Delete" disabled={busy} onClick={() => setConfirmingDelete(true)}>
+                🗑
+              </button>
+            ))}
+        </div>
+      )}
     </li>
   )
 }

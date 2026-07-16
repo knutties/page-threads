@@ -67,7 +67,7 @@ describe('ThreadView', () => {
       hasThread: true,
       threadKey: 'k1',
     })
-    expect(container.querySelectorAll('.msg-actions')).toHaveLength(1)
+    expect(container.querySelectorAll('[title="Edit"]')).toHaveLength(1)
   })
 
   test('first message is not grouped; a same-sender follow-up within the window is', () => {

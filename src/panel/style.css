@@ -35,7 +35,7 @@ header .subtitle { font-size: 12px; opacity: 0.72; overflow: hidden; text-overfl
 
 /* messages */
 .messages { flex: 1; overflow-y: auto; list-style: none; margin: 0; padding: 8px 0; background: var(--pt-body-bg); }
-.message { display: grid; grid-template-columns: 36px 1fr; gap: 9px; padding: 4px 14px; }
+.message { display: grid; grid-template-columns: 36px 1fr; gap: 9px; padding: 4px 14px; position: relative; }
 .message:hover { background: var(--pt-hover); }
 .message.grouped { padding-top: 1px; padding-bottom: 1px; }
 .avatar { width: 36px; height: 36px; border-radius: 7px; display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 14px; }
@@ -64,10 +64,19 @@ header .subtitle { font-size: 12px; opacity: 0.72; overflow: hidden; text-overfl
 .composer button:disabled { opacity: 0.5; cursor: default; }
 
 /* message actions / editor */
-.msg-actions { margin-left: auto; display: inline-flex; gap: 4px; }
-.msg-actions button { border: none; background: none; cursor: pointer; opacity: 0.5; padding: 0 2px; color: var(--pt-ink); }
-.msg-actions button:hover { opacity: 1; }
-.msg-actions .danger { color: var(--pt-danger); opacity: 1; }
+/* hover action toolbar — top-right, revealed on row hover (Slack-style) */
+.hover-actions {
+  position: absolute; top: 2px; right: 10px;
+  display: inline-flex; gap: 2px; align-items: center;
+  padding: 2px; border: 1px solid var(--pt-line); border-radius: 7px;
+  background: var(--pt-body-bg); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  opacity: 0; transition: opacity 0.08s ease;
+}
+.message:hover .hover-actions, .hover-actions:focus-within, .hover-actions.shown { opacity: 1; }
+.hover-actions button { border: none; background: none; cursor: pointer; padding: 1px 4px; font-size: 13px; line-height: 1.4; color: var(--pt-ink); border-radius: 5px; }
+.hover-actions button:hover { background: var(--pt-hover); }
+.hover-actions .danger { color: var(--pt-danger); }
+@media (prefers-reduced-motion: reduce) { .hover-actions { transition: none; } }
 .msg-editor textarea { width: 100%; min-height: 60px; font: inherit; padding: 6px; color: var(--pt-ink); background: var(--pt-body-bg); border: 1px solid var(--pt-line); border-radius: 8px; }
 .msg-editor button { margin-right: 6px; margin-top: 6px; }
 
@@ -75,8 +84,6 @@ header .subtitle { font-size: 12px; opacity: 0.72; overflow: hidden; text-overfl
 .reactions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; align-items: center; }
 .reaction-chip { border: 1px solid var(--pt-line); border-radius: 12px; background: var(--pt-pill-bg); color: var(--pt-ink); padding: 1px 8px; cursor: pointer; font-size: 12px; }
 .reaction-chip.mine { border-color: var(--pt-mine-bd); background: var(--pt-mine-bg); color: var(--pt-mine-ink); }
-.reaction-add { border: none; background: none; cursor: pointer; opacity: 0.4; color: var(--pt-ink); }
-.reaction-add:hover { opacity: 1; }
 .quick-reactions { display: inline-flex; gap: 2px; }
 .quick-reactions button { border: none; background: none; cursor: pointer; font-size: 16px; }
 
