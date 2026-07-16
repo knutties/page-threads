@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'preact/hooks'
 import type { ZulipMessage } from '../shared/zulipClient'
 import { MessageView, type ReactionInput } from './MessageView'
+import { startsNewGroup } from './messageGroup'
 import { shouldStickToBottom } from './scroll'
 
 export function ThreadView({
@@ -58,10 +59,11 @@ export function ThreadView({
   }
   return (
     <ul class="messages" ref={listRef}>
-      {messages.map((m) => (
+      {messages.map((m, i) => (
         <MessageView
           key={m.id}
           message={m}
+          grouped={!startsNewGroup(messages[i - 1] ?? null, m)}
           own={m.sender_email === ownEmail}
           realmUrl={realmUrl}
           ownUserId={ownUserId}

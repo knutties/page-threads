@@ -110,4 +110,18 @@ describe('MessageView', () => {
     fireEvent.click(screen.getByText('Cancel'))
     expect(onCancelEdit).toHaveBeenCalled()
   })
+
+  test('shows an avatar with the sender initial when not grouped', () => {
+    const { container } = renderMsg({ message: msg({ sender_full_name: 'Ada' }), grouped: false })
+    const av = container.querySelector('.avatar') as HTMLElement
+    expect(av).toBeTruthy()
+    expect(av.textContent).toBe('A')
+    expect(container.querySelector('.sender')?.textContent).toBe('Ada')
+  })
+
+  test('grouped message hides the avatar initial and the sender name', () => {
+    const { container } = renderMsg({ message: msg({ sender_full_name: 'Ada' }), grouped: true })
+    expect((container.querySelector('.avatar') as HTMLElement).textContent).toBe('')
+    expect(container.querySelector('.sender')).toBeNull()
+  })
 })
