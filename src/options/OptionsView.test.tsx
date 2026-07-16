@@ -71,4 +71,13 @@ describe('OptionsView', () => {
     await waitFor(() => expect(screen.getByText(/Could not save/i)).toBeTruthy())
     expect(strict.checked).toBe(false) // reverted
   })
+
+  test('changing Appearance writes the theme setting', async () => {
+    const store = fakeStore()
+    render(<OptionsView store={store} rulesStore={fakeRulesStore()} />)
+    const select = (await screen.findByLabelText(/Appearance/i)) as HTMLSelectElement
+    expect(select.value).toBe('system')
+    fireEvent.change(select, { target: { value: 'dark' } })
+    await waitFor(() => expect(store.current.theme).toBe('dark'))
+  })
 })

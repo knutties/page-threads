@@ -1,20 +1,33 @@
-:root { font-family: system-ui, sans-serif; font-size: 14px; color: #222; }
+:root {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 14px;
+}
 * { box-sizing: border-box; }
-body { margin: 0; }
+body { margin: 0; background: var(--pt-body-bg); color: var(--pt-ink); }
+button { font-family: inherit; }
+
 .options { max-width: 640px; margin: 24px auto; padding: 0 16px; }
-.options h1 { font-size: 20px; }
-.options .error { background: #fdecea; color: #b3261e; padding: 8px; margin: 8px 0; cursor: pointer; }
-.options section { margin: 20px 0; }
+.options h1 { font-size: 20px; font-weight: 800; }
+.options .error { background: var(--pt-error-bg); color: var(--pt-error-ink); padding: 8px 12px; margin: 8px 0; cursor: pointer; border-radius: 6px; }
+.options section { margin: 20px 0; padding-bottom: 18px; border-bottom: 1px solid var(--pt-line); }
 .options label { display: flex; gap: 8px; align-items: flex-start; font-weight: 600; }
-.options .hint { margin: 4px 0 0 24px; color: #666; font-weight: 400; }
-.loading { padding: 24px; color: #777; }
+.options .hint { margin: 4px 0 0 24px; color: var(--pt-muted); font-weight: 400; }
+.loading { padding: 24px; color: var(--pt-muted); }
+
+/* appearance */
+.appearance { flex-direction: column; gap: 6px; }
+.appearance > span { font-weight: 700; }
+.appearance select {
+  padding: 6px 8px; font: inherit; color: var(--pt-ink); background: var(--pt-body-bg);
+  border: 1px solid var(--pt-line); border-radius: 6px; max-width: 260px;
+}
 
 .rules-editor section { margin: 24px 0; }
 .rules-editor h2 { font-size: 16px; margin-bottom: 4px; }
 .rule-row, .blocked-row, .rule-add, .io { display: flex; gap: 8px; align-items: center; margin: 6px 0; flex-wrap: wrap; }
-.rule-row input { flex: 1 1 140px; padding: 4px; }
-.rule-row input[readonly] { background: #f0f0f0; }
+.rule-row input { flex: 1 1 140px; padding: 4px 6px; border: 1px solid var(--pt-line); border-radius: 6px; background: var(--pt-body-bg); color: var(--pt-ink); }
+.rule-row input[readonly] { background: var(--pt-hover); }
 .blocked-row span { flex: 1; }
-.io textarea { flex: 1 1 100%; font-family: ui-monospace, monospace; font-size: 12px; }
-.rules-editor .error { background: #fdecea; color: #b3261e; padding: 8px; cursor: pointer; }
-.rules-editor .saved { color: #1a7f37; font-size: 13px; margin: 4px 0; }
+.io textarea { flex: 1 1 100%; font-family: ui-monospace, monospace; font-size: 12px; border: 1px solid var(--pt-line); border-radius: 6px; background: var(--pt-body-bg); color: var(--pt-ink); }
+.rules-editor .error { background: var(--pt-error-bg); color: var(--pt-error-ink); padding: 8px 12px; cursor: pointer; border-radius: 6px; }
+.rules-editor .saved { color: var(--pt-send); font-size: 13px; margin: 4px 0; }
