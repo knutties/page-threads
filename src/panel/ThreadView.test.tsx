@@ -67,6 +67,17 @@ describe('ThreadView', () => {
       hasThread: true,
       threadKey: 'k1',
     })
-    expect(container.querySelectorAll('.msg-actions')).toHaveLength(1)
+    expect(container.querySelectorAll('[title="Edit"]')).toHaveLength(1)
+  })
+
+  test('first message is not grouped; a same-sender follow-up within the window is', () => {
+    const { container } = renderThread({
+      messages: [msg(1, '<p>a</p>'), msg(2, '<p>b</p>')], // same sender + timestamp
+      hasThread: true,
+      threadKey: 'k1',
+    })
+    const rows = container.querySelectorAll('.message')
+    expect(rows[0].classList.contains('grouped')).toBe(false)
+    expect(rows[1].classList.contains('grouped')).toBe(true)
   })
 })

@@ -1,4 +1,5 @@
 import { useState } from 'preact/hooks'
+import { avatarColor, avatarInitial } from '../shared/avatar'
 import type { ZulipMessage, ZulipReaction } from '../shared/zulipClient'
 import { sanitizeMessageHtml } from './renderMessage'
 
@@ -49,6 +50,7 @@ export function MessageView({
   onSaveEdit,
   onDelete,
   onToggleReaction,
+  grouped = false,
 }: {
   message: ZulipMessage
   own: boolean
@@ -61,6 +63,7 @@ export function MessageView({
   onSaveEdit: (content: string) => void
   onDelete: () => void
   onToggleReaction: (r: ReactionInput) => void
+  grouped?: boolean
 }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [picking, setPicking] = useState(false)
@@ -88,68 +91,58 @@ export function MessageView({
   const groups = groupReactions(message.reactions, ownUserId)
 
   return (
-    <li class="message">
-      <div class="meta">
-        <span class="sender">{message.sender_full_name}</span>
-        <span class="time">{new Date(message.timestamp * 1000).toLocaleString()}</span>
-        {own && !edit && (
-          <span class="msg-actions">
-            <button title="Edit" disabled={busy} onClick={onStartEdit}>
-              ✎
-            </button>
-            {confirmingDelete ? (
-              <button title="Confirm delete" class="danger" disabled={busy} onClick={onDelete}>
-                Delete?
-              </button>
-            ) : (
-              <button title="Delete" disabled={busy} onClick={() => setConfirmingDelete(true)}>
-                🗑
-              </button>
-            )}
-          </span>
-        )}
+    <li class={grouped ? 'message grouped' : 'message'}>
+      <div class="avatar" aria-hidden="true" style={grouped ? undefined : { background: avatarColor(message.sender_full_name) }}>
+        {grouped ? '' : avatarInitial(message.sender_full_name)}
       </div>
-      {edit ? (
-        <div class="msg-editor">
-          <textarea value={editText} onInput={(e) => setEditText((e.target as HTMLTextAreaElement).value)} />
-          <div>
-            <button disabled={busy || !editText.trim()} onClick={() => onSaveEdit(editText)}>
-              Save
-            </button>
-            <button disabled={busy} onClick={onCancelEdit}>
-              Cancel
-            </button>
-          </div>
+      <div class="message-main">
+        <div class="meta">
+          {!grouped && <span class="sender">{message.sender_full_name}</span>}
+          <span class="time">
+            {new Date(message.timestamp * 1000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+          </span>
         </div>
-      ) : (
-        <div
-          class="body zulip-rendered"
-          onClick={onBodyClick}
-          dangerouslySetInnerHTML={{ __html: sanitizeMessageHtml(message.content, realmUrl) }}
-        />
-      )}
-      <div class="reactions">
-        {groups.map((g) => (
-          <button
-            key={`${g.reaction.reaction_type}:${g.reaction.emoji_code}`}
-            class={g.mine ? 'reaction-chip mine' : 'reaction-chip'}
-            disabled={busy}
-            onClick={() =>
-              onToggleReaction({
-                emoji_name: g.reaction.emoji_name,
-                emoji_code: g.reaction.emoji_code,
-                reaction_type: g.reaction.reaction_type,
-              })
-            }
-          >
-            {emojiFromCode(g.reaction.emoji_code)} {g.count}
-          </button>
-        ))}
-        <button title="Add reaction" class="reaction-add" disabled={busy} onClick={() => setPicking(!picking)}>
-          +
-        </button>
+        {edit ? (
+          <div class="msg-editor">
+            <textarea value={editText} onInput={(e) => setEditText((e.target as HTMLTextAreaElement).value)} />
+            <div>
+              <button disabled={busy || !editText.trim()} onClick={() => onSaveEdit(editText)}>
+                Save
+              </button>
+              <button disabled={busy} onClick={onCancelEdit}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div
+            class="body zulip-rendered"
+            onClick={onBodyClick}
+            dangerouslySetInnerHTML={{ __html: sanitizeMessageHtml(message.content, realmUrl) }}
+          />
+        )}
+        {groups.length > 0 && (
+          <div class="reactions">
+            {groups.map((g) => (
+              <button
+                key={`${g.reaction.reaction_type}:${g.reaction.emoji_code}`}
+                class={g.mine ? 'reaction-chip mine' : 'reaction-chip'}
+                disabled={busy}
+                onClick={() =>
+                  onToggleReaction({
+                    emoji_name: g.reaction.emoji_name,
+                    emoji_code: g.reaction.emoji_code,
+                    reaction_type: g.reaction.reaction_type,
+                  })
+                }
+              >
+                {emojiFromCode(g.reaction.emoji_code)} {g.count}
+              </button>
+            ))}
+          </div>
+        )}
         {picking && (
-          <span class="quick-reactions">
+          <div class="quick-reactions">
             {QUICK_REACTIONS.map((q) => (
               <button
                 key={q.emoji_code}
@@ -162,9 +155,31 @@ export function MessageView({
                 {q.rendered}
               </button>
             ))}
-          </span>
+          </div>
         )}
       </div>
+      {!edit && (
+        <div class={picking || confirmingDelete ? 'hover-actions shown' : 'hover-actions'}>
+          <button title="Add reaction" class="react-btn" disabled={busy} onClick={() => setPicking(!picking)}>
+            😀
+          </button>
+          {own && (
+            <button title="Edit" disabled={busy} onClick={onStartEdit}>
+              ✎
+            </button>
+          )}
+          {own &&
+            (confirmingDelete ? (
+              <button title="Confirm delete" class="danger" disabled={busy} onClick={onDelete}>
+                Delete?
+              </button>
+            ) : (
+              <button title="Delete" disabled={busy} onClick={() => setConfirmingDelete(true)}>
+                🗑
+              </button>
+            ))}
+        </div>
+      )}
     </li>
   )
 }

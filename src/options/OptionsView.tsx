@@ -2,6 +2,7 @@ import { useEffect, useState } from 'preact/hooks'
 import type { Ruleset } from '../shared/ruleset'
 import { createSettingsStore, DEFAULT_SETTINGS, type Settings, type SettingsStore } from '../shared/settings'
 import type { Store } from '../shared/storage'
+import type { ThemePref } from '../shared/theme'
 import { RulesEditor } from './RulesEditor'
 
 export function OptionsView({
@@ -40,6 +41,21 @@ export function OptionsView({
     <div class="options">
       <h1>PageThreads settings</h1>
       {error && <div class="error" role="alert" onClick={() => setError(null)}>{error}</div>}
+
+      <section>
+        <label class="appearance">
+          <span>Appearance</span>
+          <select
+            value={settings.theme}
+            onChange={(e) => void update({ theme: (e.target as HTMLSelectElement).value as ThemePref })}
+          >
+            <option value="system">System (match my device)</option>
+            <option value="light">Aubergine (light)</option>
+            <option value="dark">Dark</option>
+          </select>
+        </label>
+        <p class="hint">Sets the panel and settings theme. &ldquo;System&rdquo; follows your device&rsquo;s light/dark setting.</p>
+      </section>
 
       <section>
         <label>

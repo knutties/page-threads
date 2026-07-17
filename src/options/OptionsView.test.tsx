@@ -35,7 +35,7 @@ function fakeRulesStore(initial: Ruleset = { canonical: {}, blocked: [] }): Stor
 describe('OptionsView', () => {
   test('reflects stored values on load', async () => {
     render(
-      <OptionsView store={fakeStore({ onNonWebPage: 'clear', resolveMode: 'manual' })} rulesStore={fakeRulesStore()} />
+      <OptionsView store={fakeStore({ onNonWebPage: 'clear', resolveMode: 'manual', theme: 'system' })} rulesStore={fakeRulesStore()} />
     )
     const strict = (await screen.findByLabelText(/Strict privacy/i)) as HTMLInputElement
     expect(strict.checked).toBe(true)
@@ -70,5 +70,14 @@ describe('OptionsView', () => {
     fireEvent.click(strict)
     await waitFor(() => expect(screen.getByText(/Could not save/i)).toBeTruthy())
     expect(strict.checked).toBe(false) // reverted
+  })
+
+  test('changing Appearance writes the theme setting', async () => {
+    const store = fakeStore()
+    render(<OptionsView store={store} rulesStore={fakeRulesStore()} />)
+    const select = (await screen.findByLabelText(/Appearance/i)) as HTMLSelectElement
+    expect(select.value).toBe('system')
+    fireEvent.change(select, { target: { value: 'dark' } })
+    await waitFor(() => expect(store.current.theme).toBe('dark'))
   })
 })
