@@ -3,6 +3,8 @@ import type { ZulipMessage, ZulipReaction } from './zulipClient'
 export interface PageEntity {
   entityUri: string
   title: string
+  resolverId: string
+  resolverVersion: number
 }
 
 /** Content script → service worker, via chrome.runtime.sendMessage. */
