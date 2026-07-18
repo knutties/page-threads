@@ -78,4 +78,15 @@ describe('Composer', () => {
     render(<Composer value="hello" onInput={() => {}} onSend={() => {}} disabled={false} busy={true} />)
     expect((screen.getByText('Send') as HTMLButtonElement).disabled).toBe(true)
   })
+
+  test('offline keeps the textarea editable but blocks send', () => {
+    const onSend = vi.fn()
+    render(<Composer value="hello" onInput={() => {}} onSend={onSend} disabled={false} busy={false} offline={true} />)
+    const box = screen.getByPlaceholderText('Offline — reconnect to send') as HTMLTextAreaElement
+    expect(box.disabled).toBe(false)
+    fireEvent.keyDown(box, { key: 'Enter' })
+    fireEvent.submit(box.closest('form')!)
+    expect(onSend).not.toHaveBeenCalled()
+    expect((screen.getByText('Send') as HTMLButtonElement).disabled).toBe(true)
+  })
 })

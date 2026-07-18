@@ -1,6 +1,8 @@
 import { useEffect, useReducer, useRef, useState } from 'preact/hooks'
 import { createCredentialsStore, type Credentials } from '../shared/credentials'
 import type { PageEntity, PanelToSw, RuntimeToSw, SwToPanel } from '../shared/messages'
+import { createMessageCache } from '../shared/messageCache'
+import { isNetworkError } from '../shared/netError'
 import { createSettingsStore, DEFAULT_SETTINGS, type Settings } from '../shared/settings'
 import { matchTopicByKey, topicKey, topicName } from '../shared/topic'
 import { ZulipClient } from '../shared/zulipClient'
@@ -20,6 +22,7 @@ import { threadReducer } from './threadState'
 const drafts = new Drafts()
 const settingsStore = createSettingsStore()
 const credentialsStore = createCredentialsStore()
+const messageCache = createMessageCache()
 
 interface Thread {
   entity: PageEntity
@@ -53,6 +56,7 @@ export function App() {
   const [pinned, setPinned] = useState(false)
   const [draftText, setDraftText] = useState('')
   const [sending, setSending] = useState(false)
+  const [offline, setOffline] = useState(false)
   const [editState, setEditState] = useState<{ id: number; raw: string } | null>(null)
   const [actionBusy, setActionBusy] = useState(false)
   const [pendingEntity, setPendingEntity] = useState<PageEntity | null>(null)
@@ -112,6 +116,7 @@ export function App() {
     setError(null)
     setEditState(null)
     setPendingEntity(null)
+    setOffline(false)
   }
 
   useEffect(() => {
@@ -121,6 +126,12 @@ export function App() {
       resetThreadState()
       applyCredentials(c)
     })
+  }, [])
+
+  useEffect(() => {
+    const onOnline = () => refreshCurrentThread()
+    window.addEventListener('online', onOnline)
+    return () => window.removeEventListener('online', onOnline)
   }, [])
 
   useEffect(() => {
@@ -175,6 +186,7 @@ export function App() {
       setError(null)
       setThread(null)
       setEditState(null)
+      setOffline(false)
       dispatch({ type: 'history', messages: [] })
       setDraftText(drafts.get(entity.entityUri))
       if (shouldGate(settingsRef.current.resolveMode)) {
@@ -187,6 +199,7 @@ export function App() {
       setPendingEntity(null)
       setThread(null)
       setEditState(null)
+      setOffline(false)
       dispatch({ type: 'history', messages: [] })
       setDraftText('')
     }
@@ -243,8 +256,7 @@ export function App() {
       } else if (msg.type === 'reactionChanged') {
         dispatch({ type: 'reaction', op: msg.op, id: msg.messageId, reaction: msg.reaction })
       } else if (msg.type === 'reconnected') {
-        const t = threadRef.current
-        if (t?.existingTopic) loadHistory(t.existingTopic, t.entity.entityUri).catch(() => {})
+        refreshCurrentThread()
       }
     }
 
@@ -269,8 +281,8 @@ export function App() {
       const t = threadRef.current
       if (!isReconnect || !t) {
         port.postMessage({ type: 'getActiveEntity' } satisfies PanelToSw)
-      } else if (t.existingTopic) {
-        loadHistory(t.existingTopic, t.entity.entityUri).catch(() => {})
+      } else {
+        refreshCurrentThread()
       }
     }
 
@@ -288,25 +300,53 @@ export function App() {
     const creds = credsRef.current
     if (!client || !creds) return
     const key = await topicKey(entity.entityUri)
-    const streamId = await client.getStreamId(creds.channelName)
-    const topics = await client.getTopics(streamId)
-    const existingTopic = matchTopicByKey(topics, key)
-    if (targetRef.current.currentUri !== entity.entityUri) return
-    setThread({ entity, key, existingTopic })
-    if (existingTopic) {
-      const msg: RuntimeToSw = { type: 'topicResolved', topicKey: key, topicName: existingTopic }
-      void chrome.runtime.sendMessage(msg).catch(() => {})
-      await loadHistory(existingTopic, entity.entityUri)
+    try {
+      const streamId = await client.getStreamId(creds.channelName)
+      const topics = await client.getTopics(streamId)
+      const existingTopic = matchTopicByKey(topics, key)
+      if (targetRef.current.currentUri !== entity.entityUri) return
+      setThread({ entity, key, existingTopic })
+      if (existingTopic) {
+        const msg: RuntimeToSw = { type: 'topicResolved', topicKey: key, topicName: existingTopic }
+        void chrome.runtime.sendMessage(msg).catch(() => {})
+        await loadHistory(existingTopic, entity.entityUri, key)
+      } else {
+        setOffline(false) // resolved online; no thread yet
+      }
+    } catch (e) {
+      if (!isNetworkError(e)) throw e
+      const cached = await messageCache.load(key)
+      if (targetRef.current.currentUri !== entity.entityUri) return
+      setThread({ entity, key, existingTopic: null })
+      dispatch({ type: 'history', messages: cached ?? [] })
+      setOffline(true)
     }
   }
 
-  async function loadHistory(topic: string, forUri: string) {
+  async function loadHistory(topic: string, forUri: string, key: string) {
     const client = clientRef.current
     const creds = credsRef.current
     if (!client || !creds) return
-    const fetched = await client.getMessages(creds.channelName, topic)
-    if (targetRef.current.currentUri !== forUri) return
-    dispatch({ type: 'history', messages: fetched })
+    try {
+      const fetched = await client.getMessages(creds.channelName, topic)
+      if (targetRef.current.currentUri !== forUri) return
+      dispatch({ type: 'history', messages: fetched })
+      setOffline(false)
+      void messageCache.save(key, fetched)
+    } catch (e) {
+      if (!isNetworkError(e)) throw e // 429/403/etc keep the existing error path
+      const cached = await messageCache.load(key)
+      if (targetRef.current.currentUri !== forUri) return
+      dispatch({ type: 'history', messages: cached ?? [] })
+      setOffline(true)
+    }
+  }
+
+  function refreshCurrentThread() {
+    const t = threadRef.current
+    if (!t) return
+    if (t.existingTopic) loadHistory(t.existingTopic, t.entity.entityUri, t.key).catch(() => {})
+    else void initThread(t.entity).catch(() => {}) // opened offline / not yet resolved — re-resolve
   }
 
   async function send(text: string) {
@@ -334,7 +374,7 @@ export function App() {
       await client.sendMessage(creds.channelName, topic, text)
       drafts.clear(t.entity.entityUri)
       if (targetRef.current.currentUri === t.entity.entityUri) setDraftText('')
-      await loadHistory(topic, t.entity.entityUri)
+      await loadHistory(topic, t.entity.entityUri, t.key)
     } catch (e) {
       setError(errText(e))
     } finally {
@@ -486,12 +526,18 @@ export function App() {
           onRendered={(ids, key) => readMarkerRef.current?.noteRendered(ids, key)}
         />
       )}
+      {offline && thread && (
+        <div class="offline-banner" role="status">
+          Offline — showing last saved messages. Reconnect to send.
+        </div>
+      )}
       <Composer
         value={draftText}
         onInput={onDraftInput}
         onSend={(text) => void send(text)}
         disabled={!thread}
         busy={sending}
+        offline={offline}
       />
     </div>
   )

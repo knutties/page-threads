@@ -4,16 +4,18 @@ export function Composer({
   onSend,
   disabled,
   busy,
+  offline = false,
 }: {
   value: string
   onInput: (text: string) => void
   onSend: (text: string) => void
   disabled: boolean
   busy: boolean
+  offline?: boolean
 }) {
   function submit(e: Event) {
     e.preventDefault()
-    if (busy) return // a send is already in flight; block duplicates
+    if (busy || offline) return // a send is in flight, or we're offline
     const t = value.trim()
     if (!t) return
     onSend(t)
@@ -28,10 +30,10 @@ export function Composer({
           // isComposing guards IME input; keyCode 229 is the legacy signal some engines still use.
           if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229) submit(e)
         }}
-        placeholder="Write a message…"
+        placeholder={offline ? 'Offline — reconnect to send' : 'Write a message…'}
         disabled={disabled}
       />
-      <button type="submit" disabled={disabled || busy || !value.trim()}>
+      <button type="submit" disabled={disabled || busy || offline || !value.trim()}>
         Send
       </button>
     </form>
