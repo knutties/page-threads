@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'preact/hooks'
+import { useEffect, useRef, useState } from 'preact/hooks'
 import { createRulesetStore, type Ruleset } from '../shared/ruleset'
 import type { Store } from '../shared/storage'
 import { optimisticSave } from './optimisticSave'
@@ -13,14 +13,51 @@ export function RulesEditor({ store = createRulesetStore() }: { store?: Store<Ru
   const [exported, setExported] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+  const editingRef = useRef(false)
+  const pendingRemoteRef = useRef<Ruleset | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     void store.load().then((r) => {
       setRuleset(r)
       setLoaded(true)
     })
-    return store.watch(setRuleset)
+    return store.watch((r) => {
+      // Don't overwrite an input the user is actively editing; buffer and apply on blur.
+      if (editingRef.current) pendingRemoteRef.current = r
+      else setRuleset(r)
+    })
   }, [])
+
+  useEffect(() => {
+    function onVisibility() {
+      // Backgrounding/closing the tab: commit a pending onBlur edit before we lose it.
+      if (document.visibilityState === 'hidden') (document.activeElement as HTMLElement | null)?.blur()
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => document.removeEventListener('visibilitychange', onVisibility)
+  }, [])
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const onIn = () => {
+      editingRef.current = true
+    }
+    const onOut = () => {
+      editingRef.current = false
+      if (pendingRemoteRef.current) {
+        setRuleset(pendingRemoteRef.current)
+        pendingRemoteRef.current = null
+      }
+    }
+    el.addEventListener('focusin', onIn)
+    el.addEventListener('focusout', onOut)
+    return () => {
+      el.removeEventListener('focusin', onIn)
+      el.removeEventListener('focusout', onOut)
+    }
+  }, [loaded])
 
   function flashSaved() {
     setError(null)
@@ -72,7 +109,7 @@ export function RulesEditor({ store = createRulesetStore() }: { store?: Store<Ru
   const domains = Object.keys(ruleset.canonical)
 
   return (
-    <div class="rules-editor">
+    <div class="rules-editor" ref={containerRef}>
       {error && <div class="error" role="alert" onClick={() => setError(null)}>{error}</div>}
       {saved && <div class="saved" role="status">Saved ✓</div>}
 
