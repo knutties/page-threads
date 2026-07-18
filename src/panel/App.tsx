@@ -128,6 +128,12 @@ export function App() {
   }, [])
 
   useEffect(() => {
+    const onOnline = () => refreshCurrentThread()
+    window.addEventListener('online', onOnline)
+    return () => window.removeEventListener('online', onOnline)
+  }, [])
+
+  useEffect(() => {
     void settingsStore.load().then((s) => {
       settingsRef.current = s
       settingsLoadedRef.current = true
@@ -291,15 +297,26 @@ export function App() {
     const creds = credsRef.current
     if (!client || !creds) return
     const key = await topicKey(entity.entityUri)
-    const streamId = await client.getStreamId(creds.channelName)
-    const topics = await client.getTopics(streamId)
-    const existingTopic = matchTopicByKey(topics, key)
-    if (targetRef.current.currentUri !== entity.entityUri) return
-    setThread({ entity, key, existingTopic })
-    if (existingTopic) {
-      const msg: RuntimeToSw = { type: 'topicResolved', topicKey: key, topicName: existingTopic }
-      void chrome.runtime.sendMessage(msg).catch(() => {})
-      await loadHistory(existingTopic, entity.entityUri, key)
+    try {
+      const streamId = await client.getStreamId(creds.channelName)
+      const topics = await client.getTopics(streamId)
+      const existingTopic = matchTopicByKey(topics, key)
+      if (targetRef.current.currentUri !== entity.entityUri) return
+      setThread({ entity, key, existingTopic })
+      if (existingTopic) {
+        const msg: RuntimeToSw = { type: 'topicResolved', topicKey: key, topicName: existingTopic }
+        void chrome.runtime.sendMessage(msg).catch(() => {})
+        await loadHistory(existingTopic, entity.entityUri, key)
+      } else {
+        setOffline(false) // resolved online; no thread yet
+      }
+    } catch (e) {
+      if (!isNetworkError(e)) throw e
+      const cached = await messageCache.load(key)
+      if (targetRef.current.currentUri !== entity.entityUri) return
+      setThread({ entity, key, existingTopic: null })
+      dispatch({ type: 'history', messages: cached ?? [] })
+      setOffline(true)
     }
   }
 
@@ -324,7 +341,9 @@ export function App() {
 
   function refreshCurrentThread() {
     const t = threadRef.current
-    if (t?.existingTopic) loadHistory(t.existingTopic, t.entity.entityUri, t.key).catch(() => {})
+    if (!t) return
+    if (t.existingTopic) loadHistory(t.existingTopic, t.entity.entityUri, t.key).catch(() => {})
+    else void initThread(t.entity).catch(() => {}) // opened offline / not yet resolved — re-resolve
   }
 
   async function send(text: string) {
