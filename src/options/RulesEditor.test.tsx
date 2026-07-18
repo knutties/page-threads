@@ -124,12 +124,19 @@ describe('RulesEditor', () => {
     const store = watchableStore({ canonical: { 'x.com': { keepParams: ['id'] } }, blocked: [] })
     render(<RulesEditor store={store} />)
     const kp = (await screen.findByPlaceholderText('keepParams (comma-separated)')) as HTMLInputElement
-    kp.focus()
-    fireEvent.focusIn(kp)
+    // Preact flushes useEffect on an afterNextFrame-style scheduler (rAF, or a ~35ms setTimeout
+    // fallback in jsdom). Wait it out here so the container's focusin/focusout listener effect is
+    // actually attached before we focus — otherwise editingRef never flips true and the assertions
+    // below would pass or fail for the wrong reason regardless of whether the guard exists.
+    await new Promise((r) => setTimeout(r, 50))
+    kp.focus() // real DOM focus, so jsdom fires a bubbling focusin the container listener observes
     store.emit({ canonical: { 'x.com': { keepParams: ['REMOTE'] } }, blocked: [] })
+    // Flush any Preact update that an unguarded setRuleset would have triggered, so this assertion
+    // genuinely exercises the guard instead of just reading stale synchronous DOM.
+    await new Promise((r) => setTimeout(r, 50))
     // still shows the focused value, not the remote one
     expect((screen.getByPlaceholderText('keepParams (comma-separated)') as HTMLInputElement).value).toBe('id')
-    fireEvent.focusOut(kp)
+    kp.blur() // real DOM blur, so jsdom fires the bubbling focusout the container listener observes
     await waitFor(() =>
       expect((screen.getByPlaceholderText('keepParams (comma-separated)') as HTMLInputElement).value).toBe('REMOTE')
     )
