@@ -3,6 +3,7 @@ import type { Ruleset } from '../shared/ruleset'
 import { createSettingsStore, DEFAULT_SETTINGS, type Settings, type SettingsStore } from '../shared/settings'
 import type { Store } from '../shared/storage'
 import type { ThemePref } from '../shared/theme'
+import { optimisticSave } from './optimisticSave'
 import { RulesEditor } from './RulesEditor'
 
 export function OptionsView({
@@ -25,14 +26,14 @@ export function OptionsView({
   }, [])
 
   async function update(patch: Partial<Settings>) {
-    const prev = settings
-    setSettings({ ...settings, ...patch })
-    try {
-      await store.save(patch)
-    } catch {
-      setSettings(prev)
-      setError('Could not save — try again.')
-    }
+    await optimisticSave<Settings>({
+      applyOptimistic: () => setSettings((prev) => ({ ...prev, ...patch })),
+      persist: () => store.save(patch),
+      reload: () => store.load(),
+      revert: setSettings,
+      onSuccess: () => setError(null),
+      onError: setError,
+    })
   }
 
   if (!loaded) return <div class="loading">Loading…</div>

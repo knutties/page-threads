@@ -80,4 +80,23 @@ describe('OptionsView', () => {
     fireEvent.change(select, { target: { value: 'dark' } })
     await waitFor(() => expect(store.current.theme).toBe('dark'))
   })
+
+  test('a successful save clears a prior error banner', async () => {
+    const store = fakeStore()
+    let failNext = true
+    const ok = store.save.bind(store)
+    store.save = async (patch: Partial<Settings>) => {
+      if (failNext) {
+        failNext = false
+        throw new Error('quota')
+      }
+      return ok(patch)
+    }
+    render(<OptionsView store={store} rulesStore={fakeRulesStore()} />)
+    const strict = (await screen.findByLabelText(/Strict privacy/i)) as HTMLInputElement
+    fireEvent.click(strict) // first save fails → banner appears
+    await waitFor(() => expect(screen.getByText(/Could not save/i)).toBeTruthy())
+    fireEvent.click(strict) // second save succeeds → banner clears
+    await waitFor(() => expect(screen.queryByText(/Could not save/i)).toBeNull())
+  })
 })
