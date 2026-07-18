@@ -55,12 +55,14 @@ const badge = createBadgeManager({
   },
 })
 
-void unreadStore.load().then((m) => badge.seed(m))
-void credentialsStore.load().then((c) => {
-  badgeCreds = c
-  cachedStreamId = null
-  cachedTopics = null
-})
+void Promise.all([
+  unreadStore.load().then((m) => badge.seed(m)),
+  credentialsStore.load().then((c) => {
+    badgeCreds = c
+    cachedStreamId = null
+    cachedTopics = null
+  }),
+]).then(() => refreshActiveTabBadge())
 credentialsStore.watch((c) => {
   badgeCreds = c
   cachedStreamId = null // realm may have changed
@@ -238,7 +240,10 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 })
 
 chrome.windows.onFocusChanged.addListener((windowId) => {
-  if (windowId !== chrome.windows.WINDOW_ID_NONE) void pushActiveEntity()
+  if (windowId !== chrome.windows.WINDOW_ID_NONE) {
+    void pushActiveEntity()
+    void refreshActiveTabBadge()
+  }
 })
 
 chrome.tabs.onUpdated.addListener((tabId, info) => {
