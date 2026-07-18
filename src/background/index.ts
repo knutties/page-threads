@@ -137,7 +137,10 @@ const lifecycle = createLifecycle({
           })
         }
       },
-      onReconnect: () => broadcast({ type: 'reconnected' }),
+      onReconnect: () => {
+        broadcast({ type: 'reconnected' })
+        void refreshActiveTabBadge()
+      },
     }),
 })
 

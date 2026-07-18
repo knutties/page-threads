@@ -26,10 +26,21 @@ export class EventLoop {
     const sleep = this.hooks.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)))
     let backoff = INITIAL_BACKOFF_MS
     let queue: { queueId: string; lastEventId: number } | null = null
+    let lostQueue = false // set on a queue loss; cleared when we successfully re-register
 
     while (this.running) {
       try {
-        if (!queue) queue = await this.client.register(this.channel)
+        if (!queue) {
+          queue = await this.client.register(this.channel)
+          if (lostQueue) {
+            lostQueue = false
+            try {
+              this.hooks.onReconnect?.()
+            } catch {
+              // A consumer bug must not kill the loop (mirrors the onEvent guard).
+            }
+          }
+        }
         const events = await this.client.getEvents(queue.queueId, queue.lastEventId)
         backoff = INITIAL_BACKOFF_MS
         for (const event of events) {
@@ -44,15 +55,12 @@ export class EventLoop {
       } catch (e) {
         if (!this.running) return
         if (e instanceof ZulipError && e.code === 'BAD_EVENT_QUEUE_ID') {
-          const hadQueue = queue !== null
-          queue = null
-          try {
-            this.hooks.onReconnect?.()
-          } catch {
-            // A consumer bug must not kill the loop (mirrors the onEvent guard).
+          lostQueue = true
+          if (queue) {
+            queue = null
+            continue // stale queue surfaced by getEvents: re-register immediately (no backoff)
           }
-          if (hadQueue) continue // stale queue: re-register immediately
-          // register() itself failed with this code: fall through to backoff
+          // register() itself failed with this code: fall through to backoff (no hot-spin)
         }
         await sleep(backoff)
         backoff = Math.min(backoff * 2, MAX_BACKOFF_MS)

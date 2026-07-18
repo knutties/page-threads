@@ -166,4 +166,30 @@ describe('EventLoop', () => {
     await loop.start()
     expect(registrations).toBe(2) // survived the throw and re-registered
   })
+
+  test('onReconnect fires once on genuine reconnect, not per failed re-register during an outage', async () => {
+    let registers = 0
+    let loop: EventLoop
+    const client = {
+      register: async () => {
+        registers++
+        if (registers === 1) return { queueId: 'q1', lastEventId: -1 }
+        if (registers <= 4) throw new ZulipError('bad', 'BAD_EVENT_QUEUE_ID') // re-registers 2,3,4 fail
+        return { queueId: 'q5', lastEventId: -1 } // register 5 finally succeeds
+      },
+      getEvents: async (queueId: string) => {
+        if (queueId === 'q1') throw new ZulipError('bad', 'BAD_EVENT_QUEUE_ID') // q1 goes stale
+        loop.stop()
+        return []
+      },
+    }
+    let reconnects = 0
+    loop = new EventLoop(client, 'web-threads', {
+      onEvent: () => {},
+      onReconnect: () => reconnects++,
+      sleep: async () => {},
+    })
+    await loop.start()
+    expect(reconnects).toBe(1) // only the genuine q5 reconnect — old code fired 4×
+  })
 })
