@@ -328,6 +328,8 @@ export function App() {
           await client.sendMessage(creds.channelName, topic, headerMessage(t.entity, creds.email)).catch(() => {})
         }
         setThread({ ...t, existingTopic: topic })
+        const resolved: RuntimeToSw = { type: 'topicResolved', topicKey: t.key, topicName: topic }
+        void chrome.runtime.sendMessage(resolved).catch(() => {})
       }
       await client.sendMessage(creds.channelName, topic, text)
       drafts.clear(t.entity.entityUri)
