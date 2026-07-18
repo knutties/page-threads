@@ -65,6 +65,16 @@ credentialsStore.watch((c) => {
   badgeCreds = c
   cachedStreamId = null // realm may have changed
   cachedTopics = null
+  if (c === null) {
+    // Logged out: drop cached counts and wipe every tab's badge so none linger.
+    badge.reset()
+    void unreadStore.save({}).catch(() => {})
+    void chrome.tabs.query({}).then((tabs) => {
+      for (const t of tabs) {
+        if (t.id != null) void chrome.action.setBadgeText({ tabId: t.id, text: '' }).catch(() => {})
+      }
+    })
+  }
 })
 
 async function refreshActiveTabBadge(): Promise<void> {

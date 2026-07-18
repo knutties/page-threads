@@ -34,6 +34,12 @@ export function createBadgeManager(deps: {
     seed(initial: UnreadMap): void {
       map = { ...initial }
     },
+    reset(): void {
+      // Clear all counts (a later event counts from zero) and forget the active
+      // topic so no stale-topic event repaints a badge after logout.
+      map = {}
+      activeTopicKey = null
+    },
     setActiveTab(tabId: number | null): void {
       // activeTopicKey belongs to whichever tab was last active; it is unknown for
       // a newly-active tab until refreshTab resolves it, so clear it on any change

@@ -125,4 +125,12 @@ describe('badgeManager events', () => {
     // tab 2's badge must NOT be painted with tab 1's topic count
     expect(badges).toEqual([])
   })
+
+  test('reset clears the unread map so a later event counts from zero', () => {
+    const { mgr, persisted } = setup()
+    mgr.seed({ [KEY]: 5 })
+    mgr.reset()
+    mgr.onMessageEvent(NAME, false) // increments KEY
+    expect(persisted.at(-1)![KEY]).toBe(1) // 0 → 1, not 6 — proves the map was cleared
+  })
 })
