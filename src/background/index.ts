@@ -55,16 +55,28 @@ const badge = createBadgeManager({
   },
 })
 
-void unreadStore.load().then((m) => badge.seed(m))
-void credentialsStore.load().then((c) => {
-  badgeCreds = c
-  cachedStreamId = null
-  cachedTopics = null
-})
+void Promise.all([
+  unreadStore.load().then((m) => badge.seed(m)),
+  credentialsStore.load().then((c) => {
+    badgeCreds = c
+    cachedStreamId = null
+    cachedTopics = null
+  }),
+]).then(() => refreshActiveTabBadge())
 credentialsStore.watch((c) => {
   badgeCreds = c
   cachedStreamId = null // realm may have changed
   cachedTopics = null
+  if (c === null) {
+    // Logged out: drop cached counts and wipe every tab's badge so none linger.
+    badge.reset()
+    void unreadStore.save({}).catch(() => {})
+    void chrome.tabs.query({}).then((tabs) => {
+      for (const t of tabs) {
+        if (t.id != null) void chrome.action.setBadgeText({ tabId: t.id, text: '' }).catch(() => {})
+      }
+    })
+  }
 })
 
 async function refreshActiveTabBadge(): Promise<void> {
@@ -228,7 +240,10 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 })
 
 chrome.windows.onFocusChanged.addListener((windowId) => {
-  if (windowId !== chrome.windows.WINDOW_ID_NONE) void pushActiveEntity()
+  if (windowId !== chrome.windows.WINDOW_ID_NONE) {
+    void pushActiveEntity()
+    void refreshActiveTabBadge()
+  }
 })
 
 chrome.tabs.onUpdated.addListener((tabId, info) => {

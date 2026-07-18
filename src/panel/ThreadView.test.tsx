@@ -58,7 +58,13 @@ describe('ThreadView', () => {
   test('reports rendered message ids for read marking', () => {
     const onRendered = vi.fn()
     renderThread({ messages: [msg(1, '<p>a</p>'), msg(2, '<p>b</p>')], hasThread: true, threadKey: 'k1', onRendered })
-    expect(onRendered).toHaveBeenCalledWith([1, 2])
+    expect(onRendered).toHaveBeenCalledWith([1, 2], 'k1')
+  })
+
+  test('does not report rendered ids when there is no thread key', () => {
+    const onRendered = vi.fn()
+    renderThread({ messages: [msg(1, '<p>a</p>')], hasThread: true, threadKey: null, onRendered })
+    expect(onRendered).not.toHaveBeenCalled()
   })
 
   test('own messages get actions, others do not', () => {

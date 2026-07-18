@@ -35,7 +35,7 @@ export function ThreadView({
   onSaveEdit: (id: number, content: string) => void
   onDelete: (id: number) => void
   onToggleReaction: (id: number, r: ReactionInput) => void
-  onRendered: (ids: number[]) => void
+  onRendered: (ids: number[], topicKey: string) => void
 }) {
   const listRef = useRef<HTMLUListElement>(null)
   const prevKey = useRef<string | null>(null)
@@ -50,7 +50,7 @@ export function ThreadView({
     if (keyChanged || shouldStickToBottom(el.scrollTop, el.scrollHeight, el.clientHeight)) {
       el.scrollTop = el.scrollHeight
     }
-    if (messages.length) onRendered(messages.map((m) => m.id))
+    if (messages.length && threadKey) onRendered(messages.map((m) => m.id), threadKey)
   }, [messages, threadKey])
 
   if (noPage) return <div class="empty">Open a web page to see its discussion.</div>
