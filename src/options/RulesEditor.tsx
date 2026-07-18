@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'preact/hooks'
 import { createRulesetStore, type Ruleset } from '../shared/ruleset'
 import type { Store } from '../shared/storage'
+import { optimisticSave } from './optimisticSave'
 import { parseKeepParams, rulesReducer, validateRuleset, type RulesAction } from './rulesReducer'
 
 export function RulesEditor({ store = createRulesetStore() }: { store?: Store<Ruleset> }) {
@@ -21,31 +22,33 @@ export function RulesEditor({ store = createRulesetStore() }: { store?: Store<Ru
     return store.watch(setRuleset)
   }, [])
 
+  function flashSaved() {
+    setError(null)
+    setSaved(true)
+    window.setTimeout(() => setSaved(false), 1500)
+  }
+
   async function apply(action: RulesAction) {
-    const prev = ruleset
-    const next = rulesReducer(prev, action)
-    setRuleset(next)
-    try {
-      await store.save(next)
-      setSaved(true)
-      window.setTimeout(() => setSaved(false), 1500)
-    } catch {
-      setRuleset(prev)
-      setError('Could not save — try again.')
-    }
+    const next = rulesReducer(ruleset, action)
+    await optimisticSave<Ruleset>({
+      next,
+      apply: setRuleset,
+      persist: () => store.save(next),
+      reload: () => store.load(),
+      onSuccess: flashSaved,
+      onError: setError,
+    })
   }
 
   async function replaceAll(next: Ruleset) {
-    const prev = ruleset
-    setRuleset(next)
-    try {
-      await store.save(next)
-      setSaved(true)
-      window.setTimeout(() => setSaved(false), 1500)
-    } catch {
-      setRuleset(prev)
-      setError('Could not save — try again.')
-    }
+    await optimisticSave<Ruleset>({
+      next,
+      apply: setRuleset,
+      persist: () => store.save(next),
+      reload: () => store.load(),
+      onSuccess: flashSaved,
+      onError: setError,
+    })
   }
 
   function doImport() {

@@ -80,4 +80,24 @@ describe('RulesEditor', () => {
     fireEvent.click(screen.getByText('Block'))
     expect(await screen.findByText('Saved ✓')).toBeTruthy()
   })
+
+  test('a successful save clears a prior error banner', async () => {
+    const store = fakeStore({ canonical: {}, blocked: [] })
+    let failNext = true
+    store.save = async (patch: Partial<Ruleset>) => {
+      if (failNext) {
+        failNext = false
+        throw new Error('quota')
+      }
+      store.current = { ...store.current, ...patch }
+    }
+    render(<RulesEditor store={store} />)
+    await screen.findByText('Blocked domains')
+    fireEvent.input(screen.getByPlaceholderText('add blocked domain'), { target: { value: 'a.com' } })
+    fireEvent.click(screen.getByText('Block')) // fails → banner
+    await waitFor(() => expect(screen.getByText(/Could not save/i)).toBeTruthy())
+    fireEvent.input(screen.getByPlaceholderText('add blocked domain'), { target: { value: 'b.com' } })
+    fireEvent.click(screen.getByText('Block')) // succeeds → banner clears
+    await waitFor(() => expect(screen.queryByText(/Could not save/i)).toBeNull())
+  })
 })
