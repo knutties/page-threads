@@ -75,11 +75,10 @@ export function App() {
     readMarkerRef.current?.dispose()
     readMarkerRef.current = c
       ? createReadMarker({
-          flush: async (ids) => {
+          flush: async (ids, topicKeys) => {
             await (clientRef.current?.markRead(ids) ?? Promise.resolve())
-            const t = threadRef.current
-            if (t) {
-              const msg: RuntimeToSw = { type: 'markedRead', topicKey: t.key }
+            for (const key of topicKeys) {
+              const msg: RuntimeToSw = { type: 'markedRead', topicKey: key }
               void chrome.runtime.sendMessage(msg).catch(() => {})
             }
           },
@@ -482,7 +481,7 @@ export function App() {
           onSaveEdit={(id, content) => void saveEdit(id, content)}
           onDelete={(id) => void deleteMessage(id)}
           onToggleReaction={(id, r) => void toggleReaction(id, r)}
-          onRendered={(ids) => readMarkerRef.current?.noteRendered(ids)}
+          onRendered={(ids, key) => readMarkerRef.current?.noteRendered(ids, key)}
         />
       )}
       <Composer

@@ -1,14 +1,16 @@
 export interface ReadMarker {
-  noteRendered(ids: number[]): void
+  noteRendered(ids: number[], topicKey: string): void
   dispose(): void
 }
 
 /**
- * Batches read receipts: dedupes against everything already flushed,
- * debounces the POST, keeps failed ids queued for the next attempt.
+ * Batches read receipts per topic: dedupes against everything already flushed,
+ * debounces the POST, keeps failed ids queued (under their own topic) for the
+ * next attempt. On flush it marks all ids read in one call and reports the set
+ * of distinct topics in the batch so the caller can zero each topic's badge.
  */
 export function createReadMarker(opts: {
-  flush: (ids: number[]) => Promise<void>
+  flush: (ids: number[], topicKeys: string[]) => Promise<void>
   debounceMs?: number
   isVisible?: () => boolean
   maxRetries?: number
@@ -16,21 +18,45 @@ export function createReadMarker(opts: {
   const debounceMs = opts.debounceMs ?? 2000
   const isVisible = opts.isVisible ?? (() => true)
   const maxRetries = opts.maxRetries ?? 5
-  const pending = new Set<number>()
-  const flushed = new Set<number>()
+  const pending = new Map<string, Set<number>>() // topicKey → ids awaiting flush
+  const flushed = new Set<number>() // ids confirmed read (globally unique, topic-agnostic)
   let timer: ReturnType<typeof setTimeout> | undefined
   let disposed = false
   let failures = 0
+
+  function pendingCount(): number {
+    let n = 0
+    for (const set of pending.values()) n += set.size
+    return n
+  }
+
+  function isPending(id: number): boolean {
+    for (const set of pending.values()) if (set.has(id)) return true
+    return false
+  }
+
+  function requeue(batch: ReadonlyArray<readonly [string, readonly number[]]>): void {
+    for (const [key, ids] of batch) {
+      let set = pending.get(key)
+      if (!set) {
+        set = new Set()
+        pending.set(key, set)
+      }
+      for (const id of ids) set.add(id)
+    }
+  }
 
   function schedule() {
     if (timer !== undefined) clearTimeout(timer)
     timer = setTimeout(() => {
       timer = undefined
-      const ids = [...pending]
-      if (!ids.length) return
+      const batch = [...pending.entries()].map(([key, set]) => [key, [...set]] as const)
       pending.clear()
+      const ids = batch.flatMap(([, list]) => list)
+      if (!ids.length) return
+      const topicKeys = batch.map(([key]) => key)
       opts
-        .flush(ids)
+        .flush(ids, topicKeys)
         .then(() => {
           if (disposed) return
           failures = 0
@@ -46,24 +72,29 @@ export function createReadMarker(opts: {
             failures = 0
             return
           }
-          for (const id of ids) pending.add(id) // retry on the next schedule
+          requeue(batch) // retry each id under its original topic
           schedule()
         })
     }, debounceMs)
   }
 
   return {
-    noteRendered(ids) {
+    noteRendered(ids, topicKey) {
       if (disposed || !isVisible()) return
       let added = false
+      let set = pending.get(topicKey)
       for (const id of ids) {
-        if (!flushed.has(id) && !pending.has(id)) {
-          pending.add(id)
+        if (!flushed.has(id) && !isPending(id)) {
+          if (!set) {
+            set = new Set()
+            pending.set(topicKey, set)
+          }
+          set.add(id)
           added = true
         }
       }
       if (added) failures = 0 // new content restarts the consecutive-failure budget
-      if (added || pending.size) schedule()
+      if (added || pendingCount()) schedule()
     },
     dispose() {
       disposed = true
