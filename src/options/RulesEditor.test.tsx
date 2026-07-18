@@ -154,4 +154,15 @@ describe('RulesEditor', () => {
     await waitFor(() => expect(store.current.canonical['x.com'].keepParams).toEqual(['id']))
     if (original) Object.defineProperty(document, 'visibilityState', original)
   })
+
+  test('adding a subdomain shows a registrable-domain note', async () => {
+    const store = fakeStore({ canonical: {}, blocked: [] })
+    render(<RulesEditor store={store} />)
+    await screen.findByText('Canonicalization rules')
+    fireEvent.input(screen.getByPlaceholderText('add domain, e.g. news.ycombinator.com'), {
+      target: { value: 'mail.example.com' },
+    })
+    fireEvent.click(screen.getByText('Add domain'))
+    expect(await screen.findByText(/affects all of example\.com/i)).toBeTruthy()
+  })
 })

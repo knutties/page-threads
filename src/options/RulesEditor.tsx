@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks'
 import { createRulesetStore, type Ruleset } from '../shared/ruleset'
 import type { Store } from '../shared/storage'
+import { registrableNote } from './domainNote'
 import { optimisticSave } from './optimisticSave'
 import { parseKeepParams, rulesReducer, validateRuleset, type RulesAction } from './rulesReducer'
 
@@ -9,6 +10,8 @@ export function RulesEditor({ store = createRulesetStore() }: { store?: Store<Ru
   const [loaded, setLoaded] = useState(false)
   const [newDomain, setNewDomain] = useState('')
   const [newBlocked, setNewBlocked] = useState('')
+  const [canonicalNote, setCanonicalNote] = useState<string | null>(null)
+  const [blockedNote, setBlockedNote] = useState<string | null>(null)
   const [importText, setImportText] = useState('')
   const [exported, setExported] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -147,18 +150,25 @@ export function RulesEditor({ store = createRulesetStore() }: { store?: Store<Ru
           <input
             placeholder="add domain, e.g. news.ycombinator.com"
             value={newDomain}
-            onInput={(e) => setNewDomain((e.target as HTMLInputElement).value)}
+            onInput={(e) => {
+              setNewDomain((e.target as HTMLInputElement).value)
+              setCanonicalNote(null)
+            }}
           />
           <button
             onClick={() => {
               const d = newDomain.trim()
-              if (d) void apply({ type: 'addDomain', domain: d })
+              if (d) {
+                void apply({ type: 'addDomain', domain: d })
+                setCanonicalNote(registrableNote(d))
+              }
               setNewDomain('')
             }}
           >
             Add domain
           </button>
         </div>
+        {canonicalNote && <p class="hint domain-note">{canonicalNote}</p>}
       </section>
 
       <section>
@@ -174,18 +184,25 @@ export function RulesEditor({ store = createRulesetStore() }: { store?: Store<Ru
           <input
             placeholder="add blocked domain"
             value={newBlocked}
-            onInput={(e) => setNewBlocked((e.target as HTMLInputElement).value)}
+            onInput={(e) => {
+              setNewBlocked((e.target as HTMLInputElement).value)
+              setBlockedNote(null)
+            }}
           />
           <button
             onClick={() => {
               const d = newBlocked.trim()
-              if (d) void apply({ type: 'addBlocked', domain: d })
+              if (d) {
+                void apply({ type: 'addBlocked', domain: d })
+                setBlockedNote(registrableNote(d))
+              }
               setNewBlocked('')
             }}
           >
             Block
           </button>
         </div>
+        {blockedNote && <p class="hint domain-note">{blockedNote}</p>}
       </section>
 
       <section>
