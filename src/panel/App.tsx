@@ -116,6 +116,7 @@ export function App() {
     setError(null)
     setEditState(null)
     setPendingEntity(null)
+    setOffline(false)
   }
 
   useEffect(() => {
@@ -185,6 +186,7 @@ export function App() {
       setError(null)
       setThread(null)
       setEditState(null)
+      setOffline(false)
       dispatch({ type: 'history', messages: [] })
       setDraftText(drafts.get(entity.entityUri))
       if (shouldGate(settingsRef.current.resolveMode)) {
@@ -197,6 +199,7 @@ export function App() {
       setPendingEntity(null)
       setThread(null)
       setEditState(null)
+      setOffline(false)
       dispatch({ type: 'history', messages: [] })
       setDraftText('')
     }
