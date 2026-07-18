@@ -71,10 +71,10 @@ export function RulesEditor({ store = createRulesetStore() }: { store?: Store<Ru
   async function apply(action: RulesAction) {
     const next = rulesReducer(ruleset, action)
     await optimisticSave<Ruleset>({
-      next,
-      apply: setRuleset,
+      applyOptimistic: () => setRuleset(next),
       persist: () => store.save(next),
       reload: () => store.load(),
+      revert: setRuleset,
       onSuccess: flashSaved,
       onError: setError,
     })
@@ -82,10 +82,10 @@ export function RulesEditor({ store = createRulesetStore() }: { store?: Store<Ru
 
   async function replaceAll(next: Ruleset) {
     await optimisticSave<Ruleset>({
-      next,
-      apply: setRuleset,
+      applyOptimistic: () => setRuleset(next),
       persist: () => store.save(next),
       reload: () => store.load(),
+      revert: setRuleset,
       onSuccess: flashSaved,
       onError: setError,
     })

@@ -1,23 +1,30 @@
 /**
- * Optimistic write with revert-to-store-truth. Applies `next` immediately, then
- * persists; on success clears the error via onSuccess; on failure re-reads the
- * store (the serialized source of truth) and applies that — never a stale
- * in-memory snapshot, so a rejected earlier save can't discard a later edit.
+ * Optimistic write with revert-to-store-truth. Runs the caller's optimistic
+ * update, then persists; on success clears the error via onSuccess; on failure
+ * re-reads the store (serialized source of truth) and reverts to it — never a
+ * stale in-memory snapshot, so a rejected earlier save can't discard a later
+ * edit. applyOptimistic is a thunk so callers can use a functional setState
+ * (building on the latest committed state under rapid edits). If reload itself
+ * rejects, the error is still reported.
  */
 export async function optimisticSave<T>(deps: {
-  next: T
-  apply: (value: T) => void
-  persist: (value: T) => Promise<void>
+  applyOptimistic: () => void
+  persist: () => Promise<void>
   reload: () => Promise<T>
+  revert: (truth: T) => void
   onSuccess: () => void
   onError: (message: string) => void
 }): Promise<void> {
-  deps.apply(deps.next)
+  deps.applyOptimistic()
   try {
-    await deps.persist(deps.next)
+    await deps.persist()
     deps.onSuccess()
   } catch {
-    deps.apply(await deps.reload())
+    try {
+      deps.revert(await deps.reload())
+    } catch {
+      // reload also failed — keep the optimistic value on screen; still report below.
+    }
     deps.onError('Could not save — try again.')
   }
 }

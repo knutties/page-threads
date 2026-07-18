@@ -27,10 +27,10 @@ export function OptionsView({
 
   async function update(patch: Partial<Settings>) {
     await optimisticSave<Settings>({
-      next: { ...settings, ...patch },
-      apply: setSettings,
+      applyOptimistic: () => setSettings((prev) => ({ ...prev, ...patch })),
       persist: () => store.save(patch),
       reload: () => store.load(),
+      revert: setSettings,
       onSuccess: () => setError(null),
       onError: setError,
     })
