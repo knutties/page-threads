@@ -117,3 +117,5 @@ header .subtitle { font-size: 12px; opacity: 0.72; overflow: hidden; text-overfl
 .gate { flex: 1; display: flex; flex-direction: column; gap: 10px; align-items: center; justify-content: center; padding: 24px; text-align: center; }
 .gate-title { font-weight: 600; overflow-wrap: anywhere; }
 .gate .hint { color: var(--pt-muted); font-size: 12px; }
+
+.offline-banner { background: var(--pt-pill-bg); color: var(--pt-muted); padding: 6px 12px; font-size: 12px; border-top: 1px solid var(--pt-line); }
