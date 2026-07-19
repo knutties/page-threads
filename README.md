@@ -15,6 +15,11 @@ third-party service — the privacy story is the product.
 > for milestone status and per-chunk acceptance checklists, and [WHAT.md](WHAT.md)
 > for the full spec.
 
+<p align="center">
+  <img src="docs/panel.svg" alt="PageThreads side panel in the Aubergine theme — illustration" width="340">
+</p>
+<p align="center"><sub>The side panel (Aubergine theme) — illustration, not a live screenshot.</sub></p>
+
 ## Features
 
 - **Follows the active tab** — the panel re-targets as you switch tabs and on SPA
