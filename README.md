@@ -121,3 +121,7 @@ single HTML-injection gate, and API keys out of any page-visible context.
 TypeScript (strict), Preact, Vite (multi-entry: panel / options / background /
 content), Vitest + Testing Library, DOMPurify (sanitization), tldts
 (registrable-domain matching). No backend beyond Zulip's REST + events API.
+
+## License
+
+[MIT](LICENSE) © 2026 Natarajan Kannan.
