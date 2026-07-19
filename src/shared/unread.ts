@@ -1,3 +1,4 @@
+import { browser } from './browser'
 import { createStore, type StorageAreaLike, type StorageChangedLike, type Store } from './storage'
 
 export type UnreadMap = Record<string, number>
@@ -22,8 +23,8 @@ export function unreadReducer(map: UnreadMap, action: UnreadAction): UnreadMap {
 
 /** Per-topicKey unread counts, cached in chrome.storage.session (rebuildable). */
 export function createUnreadStore(
-  area: StorageAreaLike = chrome.storage.session,
-  changed: StorageChangedLike = chrome.storage.onChanged,
+  area: StorageAreaLike = browser.storage.session,
+  changed: StorageChangedLike = browser.storage.onChanged,
   areaName = 'session'
 ): Store<UnreadMap> {
   return createStore('unread', {}, area, changed, areaName)

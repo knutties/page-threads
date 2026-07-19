@@ -1,3 +1,4 @@
+import { browser } from './browser'
 import type { StorageAreaLike } from './storage'
 import type { ZulipMessage } from './zulipClient'
 
@@ -50,7 +51,7 @@ export interface MessageCache {
  * then give up silently.
  */
 export function createMessageCache(
-  area: StorageAreaLike = chrome.storage.local,
+  area: StorageAreaLike = browser.storage.local,
   now: () => number = () => Date.now()
 ): MessageCache {
   let chain: Promise<unknown> = Promise.resolve()

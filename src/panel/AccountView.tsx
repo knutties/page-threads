@@ -1,3 +1,4 @@
+import { browser } from '../shared/browser'
 import type { Credentials } from '../shared/credentials'
 
 export function AccountView({
@@ -27,7 +28,7 @@ export function AccountView({
         <dt>Channel</dt>
         <dd>#{credentials.channelName}</dd>
       </dl>
-      <button onClick={() => chrome.runtime.openOptionsPage()}>Settings</button>
+      <button onClick={() => browser.runtime.openOptionsPage()}>Settings</button>
       <button class="danger" onClick={onSignOut}>
         Sign out
       </button>

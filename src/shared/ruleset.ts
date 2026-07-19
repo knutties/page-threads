@@ -1,4 +1,5 @@
 import { getDomain } from 'tldts'
+import { browser } from './browser'
 import { createStore, type StorageAreaLike, type StorageChangedLike, type Store } from './storage'
 
 export interface CanonicalRule {
@@ -18,8 +19,8 @@ export const DEFAULT_RULESET: Ruleset = {
 }
 
 export function createRulesetStore(
-  area: StorageAreaLike = chrome.storage.sync,
-  changed: StorageChangedLike = chrome.storage.onChanged,
+  area: StorageAreaLike = browser.storage.sync,
+  changed: StorageChangedLike = browser.storage.onChanged,
   areaName = 'sync'
 ): Store<Ruleset> {
   return createStore('ruleset', DEFAULT_RULESET, area, changed, areaName)

@@ -1,4 +1,5 @@
 import { useEffect, useReducer, useRef, useState } from 'preact/hooks'
+import { browser } from '../shared/browser'
 import { createCredentialsStore, type Credentials } from '../shared/credentials'
 import type { PageEntity, PanelToSw, RuntimeToSw, SwToPanel } from '../shared/messages'
 import { createMessageCache } from '../shared/messageCache'
@@ -33,7 +34,7 @@ interface Thread {
 
 function notifySwCredentialsChanged(): void {
   const msg: RuntimeToSw = { type: 'credentialsChanged' }
-  void chrome.runtime.sendMessage(msg).catch(() => {})
+  void browser.runtime.sendMessage(msg).catch(() => {})
 }
 
 export function App() {
@@ -74,7 +75,7 @@ export function App() {
             await (clientRef.current?.markRead(ids) ?? Promise.resolve())
             for (const key of topicKeys) {
               const msg: RuntimeToSw = { type: 'markedRead', topicKey: key }
-              void chrome.runtime.sendMessage(msg).catch(() => {})
+              void browser.runtime.sendMessage(msg).catch(() => {})
             }
           },
           isVisible: () => document.visibilityState === 'visible',
@@ -252,7 +253,7 @@ export function App() {
     }
 
     function connect(isReconnect: boolean) {
-      port = chrome.runtime.connect({ name: 'panel' })
+      port = browser.runtime.connect({ name: 'panel' })
       portRef.current = port
       port.onMessage.addListener(handleMessage)
       pingTimer = window.setInterval(() => {
@@ -299,7 +300,7 @@ export function App() {
       setThread({ entity, key, existingTopic })
       if (existingTopic) {
         const msg: RuntimeToSw = { type: 'topicResolved', topicKey: key, topicName: existingTopic }
-        void chrome.runtime.sendMessage(msg).catch(() => {})
+        void browser.runtime.sendMessage(msg).catch(() => {})
         await loadHistory(existingTopic, entity.entityUri, key)
       } else {
         setOffline(false) // resolved online; no thread yet
@@ -360,7 +361,7 @@ export function App() {
         }
         setThread({ ...t, existingTopic: topic })
         const resolved: RuntimeToSw = { type: 'topicResolved', topicKey: t.key, topicName: topic }
-        void chrome.runtime.sendMessage(resolved).catch(() => {})
+        void browser.runtime.sendMessage(resolved).catch(() => {})
       }
       await client.sendMessage(creds.channelName, topic, text)
       drafts.clear(t.entity.entityUri)

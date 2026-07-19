@@ -1,3 +1,4 @@
+import { browser } from './browser'
 import type { ChangeListener, StorageAreaLike, StorageChangedLike } from './storage'
 
 export interface Credentials {
@@ -18,8 +19,8 @@ const KEY = 'credentials'
 
 /** Whole-record writes (never merged), so there is no read-merge-write race here. */
 export function createCredentialsStore(
-  area: StorageAreaLike = chrome.storage.local,
-  changed: StorageChangedLike = chrome.storage.onChanged,
+  area: StorageAreaLike = browser.storage.local,
+  changed: StorageChangedLike = browser.storage.onChanged,
   areaName = 'local'
 ): CredentialsStore {
   return {

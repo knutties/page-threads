@@ -1,3 +1,5 @@
+import { browser } from './browser'
+
 export interface StorageAreaLike {
   get(key: string): Promise<Record<string, unknown>>
   set(items: Record<string, unknown>): Promise<void>
@@ -28,8 +30,8 @@ export interface Store<T> {
 export function createStore<T extends object>(
   key: string,
   defaults: T,
-  area: StorageAreaLike = chrome.storage.local,
-  changed: StorageChangedLike = chrome.storage.onChanged,
+  area: StorageAreaLike = browser.storage.local,
+  changed: StorageChangedLike = browser.storage.onChanged,
   areaName = 'local'
 ): Store<T> {
   let writeChain: Promise<void> = Promise.resolve()
