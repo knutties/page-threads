@@ -25,4 +25,13 @@ describe('headerMessage', () => {
   test('sources the version from the entity, not a hardcoded literal', () => {
     expect(headerMessage(entity({ resolverVersion: 2 }), 'me@x.com')).toContain('(resolver web@2)')
   })
+
+  test('falls back to the current resolver identity if the entity lacks the descriptor (version skew)', () => {
+    // A content script that predates the descriptor (e.g. still injected in an open
+    // tab during an extension update) sends an entity without resolverId/resolverVersion.
+    const skewed = { entityUri: 'web:https://x.com/a', title: 'X Article' } as unknown as PageEntity
+    const out = headerMessage(skewed, 'me@x.com')
+    expect(out).toContain('(resolver web@1)')
+    expect(out).not.toContain('undefined')
+  })
 })
