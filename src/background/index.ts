@@ -1,3 +1,4 @@
+import { browser } from '../shared/browser'
 import { createCredentialsStore, type Credentials } from '../shared/credentials'
 import type { PageEntity, PanelToSw, RuntimeToSw, SwToContent, SwToPanel } from '../shared/messages'
 import { matchTopicByKey, topicKey as deriveTopicKey } from '../shared/topic'
@@ -7,7 +8,7 @@ import { createBadgeManager, type ResolvedTopic } from './badgeManager'
 import { EventLoop } from './eventLoop'
 import { createLifecycle } from './lifecycle'
 
-chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {})
+browser.sidePanel?.setPanelBehavior?.({ openPanelOnActionClick: true })?.catch(() => {})
 
 const tabEntities = new Map<number, PageEntity>()
 const ports = new Set<chrome.runtime.Port>()
@@ -48,7 +49,7 @@ const badge = createBadgeManager({
   computeCount: (topicName) =>
     badgeCreds ? new ZulipClient(badgeCreds).getUnreadCount(badgeCreds.channelName, topicName) : Promise.resolve(0),
   setBadge: (tabId, text) => {
-    void chrome.action.setBadgeText({ tabId, text }).catch(() => {})
+    void browser.action.setBadgeText({ tabId, text }).catch(() => {})
   },
   onChange: (map) => {
     void unreadStore.save(map).catch(() => {})
@@ -71,16 +72,16 @@ credentialsStore.watch((c) => {
     // Logged out: drop cached counts and wipe every tab's badge so none linger.
     badge.reset()
     void unreadStore.save({}).catch(() => {})
-    void chrome.tabs.query({}).then((tabs) => {
+    void browser.tabs.query({}).then((tabs) => {
       for (const t of tabs) {
-        if (t.id != null) void chrome.action.setBadgeText({ tabId: t.id, text: '' }).catch(() => {})
+        if (t.id != null) void browser.action.setBadgeText({ tabId: t.id, text: '' }).catch(() => {})
       }
     })
   }
 })
 
 async function refreshActiveTabBadge(): Promise<void> {
-  const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true })
+  const [tab] = await browser.tabs.query({ active: true, lastFocusedWindow: true })
   if (tab?.id == null) return
   badge.setActiveTab(tab.id)
   const lookup = await lookupEntity(tab.id)
@@ -93,8 +94,8 @@ async function refreshActiveTabBadge(): Promise<void> {
   await badge.refreshTab(tab.id, lookup.kind === 'entity' ? lookup.entity.entityUri : null)
 }
 
-chrome.alarms.create('badge', { periodInMinutes: 2 })
-chrome.alarms.onAlarm.addListener((alarm) => {
+browser.alarms.create('badge', { periodInMinutes: 2 })
+browser.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === 'badge') void refreshActiveTabBadge()
 })
 
@@ -176,7 +177,7 @@ async function lookupEntity(tabId: number): Promise<EntityLookup> {
   if (cached) return { kind: 'entity', entity: cached }
   try {
     const msg: SwToContent = { type: 'queryEntity' }
-    const entity = (await chrome.tabs.sendMessage(tabId, msg)) as PageEntity | undefined
+    const entity = (await browser.tabs.sendMessage(tabId, msg)) as PageEntity | undefined
     if (entity) {
       tabEntities.set(tabId, entity)
       return { kind: 'entity', entity }
@@ -198,7 +199,7 @@ let pushGeneration = 0
 async function pushActiveEntity(): Promise<void> {
   const generation = ++pushGeneration
   try {
-    const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true })
+    const [tab] = await browser.tabs.query({ active: true, lastFocusedWindow: true })
     const entity = tab?.id != null ? await entityForTab(tab.id) : null
     if (generation !== pushGeneration) return // a newer evaluation superseded this one
     const uri = entity?.entityUri ?? null
@@ -211,12 +212,12 @@ async function pushActiveEntity(): Promise<void> {
   }
 }
 
-chrome.tabs.onActivated.addListener(() => {
+browser.tabs.onActivated.addListener(() => {
   void pushActiveEntity()
   void refreshActiveTabBadge()
 })
 
-chrome.runtime.onMessage.addListener((msg: RuntimeToSw, sender) => {
+browser.runtime.onMessage.addListener((msg: RuntimeToSw, sender) => {
   if (msg.type === 'pageEntity' && sender.tab?.id != null) {
     tabEntities.set(sender.tab.id, {
       entityUri: msg.entityUri,
@@ -235,26 +236,26 @@ chrome.runtime.onMessage.addListener((msg: RuntimeToSw, sender) => {
   } else if (msg.type === 'topicResolved') {
     // The side panel is an extension page, so sender.tab is undefined. The panel
     // is window-scoped and only resolves the active tab's thread, so badge that tab.
-    void chrome.tabs.query({ active: true, lastFocusedWindow: true }).then(([tab]) => {
+    void browser.tabs.query({ active: true, lastFocusedWindow: true }).then(([tab]) => {
       if (tab?.id != null) void badge.refreshResolved(tab.id, msg.topicKey, msg.topicName)
     })
   }
 })
 
-chrome.tabs.onRemoved.addListener((tabId) => {
+browser.tabs.onRemoved.addListener((tabId) => {
   tabEntities.delete(tabId)
   void pushActiveEntity()
-  void chrome.action.setBadgeText({ tabId, text: '' }).catch(() => {})
+  void browser.action.setBadgeText({ tabId, text: '' }).catch(() => {})
 })
 
-chrome.windows.onFocusChanged.addListener((windowId) => {
-  if (windowId !== chrome.windows.WINDOW_ID_NONE) {
+browser.windows.onFocusChanged.addListener((windowId) => {
+  if (windowId !== browser.windows.WINDOW_ID_NONE) {
     void pushActiveEntity()
     void refreshActiveTabBadge()
   }
 })
 
-chrome.tabs.onUpdated.addListener((tabId, info) => {
+browser.tabs.onUpdated.addListener((tabId, info) => {
   // A tab that navigated somewhere content scripts can't run must not keep a stale entity.
   if (info.status === 'loading' && info.url && !/^https?:/.test(info.url)) {
     tabEntities.delete(tabId)
@@ -262,7 +263,7 @@ chrome.tabs.onUpdated.addListener((tabId, info) => {
   }
 })
 
-chrome.runtime.onConnect.addListener((port) => {
+browser.runtime.onConnect.addListener((port) => {
   if (port.name !== 'panel') return
   ports.add(port)
 
@@ -270,7 +271,7 @@ chrome.runtime.onConnect.addListener((port) => {
 
   port.onMessage.addListener((msg: PanelToSw) => {
     if (msg.type === 'getActiveEntity') {
-      void chrome.tabs
+      void browser.tabs
         .query({ active: true, lastFocusedWindow: true })
         .then(async ([tab]) => {
           const entity = tab?.id != null ? await entityForTab(tab.id) : null

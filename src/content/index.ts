@@ -1,3 +1,4 @@
+import { browser } from '../shared/browser'
 import type { ContentToSw, SwToContent } from '../shared/messages'
 import { RESOLVER_ID, RESOLVER_VERSION, resolveWebEntity } from '../shared/resolver'
 import { createRulesetStore, isBlocked, type Ruleset } from '../shared/ruleset'
@@ -24,7 +25,7 @@ function report(entityUri: string): void {
     resolverId: RESOLVER_ID,
     resolverVersion: RESOLVER_VERSION,
   }
-  void chrome.runtime.sendMessage(msg).catch(() => {
+  void browser.runtime.sendMessage(msg).catch(() => {
     // Service worker may not be listening yet (e.g. right after install); harmless.
   })
 }
@@ -35,7 +36,7 @@ function resolveAndReport(): void {
     // Retract any entity the SW cached for this tab before the block took effect,
     // so a later tab re-activation can't resolve the now-blocked page.
     const msg: ContentToSw = { type: 'pageBlocked' }
-    void chrome.runtime.sendMessage(msg).catch(() => {})
+    void browser.runtime.sendMessage(msg).catch(() => {})
     return
   }
   report(resolveUri())
@@ -88,7 +89,7 @@ if (navigation) {
 
 // The SW's tab-entity map dies with every MV3 service-worker restart; let it
 // re-query this tab. A blocked domain returns nothing usable.
-chrome.runtime.onMessage.addListener((msg: SwToContent, _sender, sendResponse) => {
+browser.runtime.onMessage.addListener((msg: SwToContent, _sender, sendResponse) => {
   if (msg.type === 'queryEntity') {
     if (!loaded || isBlocked(pageDomain(), ruleset.blocked)) {
       sendResponse(null)
