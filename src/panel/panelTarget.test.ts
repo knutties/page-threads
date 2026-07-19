@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { panelTarget, type PanelTargetState } from './panelTarget'
 
-const entity = (uri: string) => ({ entityUri: uri, title: 'T' })
+const entity = (uri: string) => ({ entityUri: uri, title: 'T', resolverId: 'web', resolverVersion: 1 })
 const s = (pinned: boolean, currentUri: string | null): PanelTargetState => ({ pinned, currentUri })
 
 describe('panelTarget', () => {

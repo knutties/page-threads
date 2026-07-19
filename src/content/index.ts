@@ -1,5 +1,5 @@
-import { canonicalize } from '../shared/canonicalize'
 import type { ContentToSw, SwToContent } from '../shared/messages'
+import { RESOLVER_ID, RESOLVER_VERSION, resolveWebEntity } from '../shared/resolver'
 import { createRulesetStore, isBlocked, type Ruleset } from '../shared/ruleset'
 import { createNavWatcher } from './navWatcher'
 
@@ -13,11 +13,17 @@ function pageDomain(): string {
 
 function resolveUri(): string {
   const link = document.querySelector<HTMLLinkElement>('link[rel="canonical"]')
-  return 'web:' + canonicalize(location.href, link?.getAttribute('href') ?? null, ruleset.canonical)
+  return resolveWebEntity(location.href, link?.getAttribute('href') ?? null, ruleset.canonical).entityUri
 }
 
 function report(entityUri: string): void {
-  const msg: ContentToSw = { type: 'pageEntity', entityUri, title: document.title }
+  const msg: ContentToSw = {
+    type: 'pageEntity',
+    entityUri,
+    title: document.title,
+    resolverId: RESOLVER_ID,
+    resolverVersion: RESOLVER_VERSION,
+  }
   void chrome.runtime.sendMessage(msg).catch(() => {
     // Service worker may not be listening yet (e.g. right after install); harmless.
   })
@@ -87,7 +93,12 @@ chrome.runtime.onMessage.addListener((msg: SwToContent, _sender, sendResponse) =
     if (!loaded || isBlocked(pageDomain(), ruleset.blocked)) {
       sendResponse(null)
     } else {
-      sendResponse({ entityUri: resolveUri(), title: document.title })
+      sendResponse({
+        entityUri: resolveUri(),
+        title: document.title,
+        resolverId: RESOLVER_ID,
+        resolverVersion: RESOLVER_VERSION,
+      })
     }
   }
 })

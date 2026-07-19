@@ -10,6 +10,7 @@ import { AccountView } from './AccountView'
 import { Composer } from './Composer'
 import { Drafts } from './drafts'
 import { topicMatchesKey } from './eventMatch'
+import { headerMessage } from './headerMessage'
 import { headerSubtitle } from './headerSubtitle'
 import type { ReactionInput } from './MessageView'
 import { panelTarget, type PanelTargetState } from './panelTarget'
@@ -28,16 +29,6 @@ interface Thread {
   entity: PageEntity
   key: string
   existingTopic: string | null
-}
-
-function headerMessage(entity: PageEntity, email: string): string {
-  const representativeUrl = entity.entityUri.replace(/^web:/, '')
-  return [
-    `🔗 Discussion for: ${entity.title}`,
-    `Entity: \`${entity.entityUri}\` (resolver web@1)`,
-    `Link: ${representativeUrl}`,
-    `Started by ${email}`,
-  ].join('\n')
 }
 
 function notifySwCredentialsChanged(): void {
