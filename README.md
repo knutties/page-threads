@@ -90,6 +90,18 @@ open settings or sign out.
 
 ## Development
 
+**Toolchain (optional Nix):** a [Nix](https://nixos.org) flake pins the Node/npm
+toolchain for a reproducible setup. With flakes enabled:
+
+```bash
+nix develop        # drops you into a shell with the pinned Node 22 + npm
+# or, with direnv:  direnv allow   (auto-loads on cd, via .envrc)
+npm ci && npm run build && npm test
+```
+
+Nix is not required — any Node 20+ with npm works. The flake covers only the JS
+toolchain; the Zulip backend (Docker) and Chrome for Testing stay external.
+
 **Backend:** a local Zulip via docker — see [dev/zulip/README.md](dev/zulip/README.md).
 Test users and the `web-threads` channel are set up there.
 
