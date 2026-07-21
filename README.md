@@ -16,9 +16,9 @@ third-party service — the privacy story is the product.
 > for the full spec.
 
 <p align="center">
-  <img src="docs/panel.svg" alt="PageThreads side panel in the Aubergine theme — illustration" width="340">
+  <img src="docs/in-context.svg" alt="PageThreads docked beside a web page — illustration" width="760">
 </p>
-<p align="center"><sub>The side panel (Aubergine theme) — illustration, not a live screenshot.</sub></p>
+<p align="center"><sub>PageThreads docked beside the page it discusses — illustration, not a live screenshot.</sub></p>
 
 ## Features
 
@@ -58,6 +58,20 @@ a single channel (default `#web-threads`); the extension resolves threads by the
 `· <key>` suffix (titles can change, the key can't). The first post seeds a header
 message recording the entity URI and resolver version — a durable, versioned
 identity for the thread.
+
+## Screenshots
+
+The same thread is a stock Zulip topic — no server code beyond Zulip. The seeded
+header message records the entity URI and resolver version:
+
+<p align="center">
+  <img src="docs/zulip-view.svg" alt="The same thread as a topic in Zulip's #web-threads channel — illustration" width="760">
+</p>
+
+<p align="center">
+  <img src="docs/panel.svg" alt="The side panel (Aubergine theme), close up — illustration" width="300">
+  <br><sub>The side panel, close up. All illustrations, not live screenshots.</sub>
+</p>
 
 ## Install & build
 

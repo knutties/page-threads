@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 560" width="940" height="560" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" role="img" aria-label="The same thread shown in the Zulip web interface as a topic in the web-threads channel (illustration)">
+  <defs>
+    <filter id="z-shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="14" flood-color="#0c0a10" flood-opacity="0.22"/>
+    </filter>
+    <clipPath id="zwin"><rect x="10" y="10" width="920" height="540" rx="12"/></clipPath>
+    <clipPath id="zpane"><rect x="220" y="10" width="710" height="540"/></clipPath>
+  </defs>
+
+  <rect width="940" height="560" fill="#eceaf0"/>
+  <rect x="10" y="10" width="920" height="540" rx="12" fill="#ffffff" filter="url(#z-shadow)"/>
+
+  <g clip-path="url(#zwin)">
+    <rect x="10" y="10" width="920" height="540" fill="#ffffff"/>
+
+    <!-- ===== left sidebar ===== -->
+    <rect x="10" y="10" width="210" height="540" fill="#ebe8ee"/>
+    <text x="30" y="42" font-size="15" font-weight="800" fill="#3f0e40">PageThreads</text>
+    <rect x="26" y="54" width="178" height="24" rx="6" fill="#ffffff" stroke="#d8d4de"/>
+    <text x="40" y="70" font-size="11" fill="#8b8792">Filter channels…</text>
+
+    <text x="30" y="104" font-size="10" font-weight="700" fill="#6b6b73" letter-spacing="0.8">CHANNELS</text>
+    <rect x="14" y="112" width="196" height="24" rx="5" fill="#d9c7dc"/>
+    <text x="30" y="129" font-size="12.5" font-weight="700" fill="#3f0e40"># web-threads</text>
+
+    <!-- topics under the selected channel -->
+    <rect x="14" y="138" width="196" height="23" fill="#e7dcea"/>
+    <rect x="14" y="138" width="3" height="23" fill="#3f0e40"/>
+    <text x="42" y="154" font-size="11.5" fill="#2b2b30" font-weight="600">India lose No.1 T20I ran…</text>
+    <text x="42" y="180" font-size="11.5" fill="#8a8a92">React 19 release notes</text>
+    <text x="42" y="201" font-size="11.5" fill="#8a8a92">Show HN: a tiny key-value DB</text>
+
+    <text x="30" y="240" font-size="10" font-weight="700" fill="#6b6b73" letter-spacing="0.8">DIRECT MESSAGES</text>
+    <circle cx="34" cy="261" r="4" fill="#2eb67d"/>
+    <text x="46" y="265" font-size="11.5" fill="#3a3a42">Ada Lovelace</text>
+    <circle cx="34" cy="285" r="4" fill="#cfcfd6"/>
+    <text x="46" y="289" font-size="11.5" fill="#3a3a42">Ravi Kumar</text>
+
+    <!-- ===== main pane ===== -->
+    <g clip-path="url(#zpane)">
+      <rect x="220" y="10" width="710" height="540" fill="#ffffff"/>
+
+      <!-- topic / recipient bar -->
+      <rect x="220" y="10" width="710" height="40" fill="#ffffff"/>
+      <line x1="220" y1="50" x2="930" y2="50" stroke="#e6e4ea"/>
+      <text x="240" y="35" font-size="13.5" font-weight="800" fill="#17171b"># web-threads</text>
+      <text x="342" y="35" font-size="13" fill="#6b6b73">❯  India lose No.1 T20I ranking · Qm9hVc3k7ZpLx2Rt</text>
+
+      <!-- header / seed message (highlighted) -->
+      <rect x="228" y="86" width="682" height="86" rx="6" fill="#faf6fb"/>
+      <rect x="228" y="86" width="3" height="86" fill="#3f0e40"/>
+      <rect x="240" y="64" width="34" height="34" rx="7" fill="#3f0e40"/>
+      <text x="257" y="86" fill="#ffffff" font-size="12" font-weight="800" text-anchor="middle">PT</text>
+      <text x="286" y="80" font-size="13" font-weight="700" fill="#17171b">Nat</text>
+      <rect x="312" y="70" width="88" height="14" rx="7" fill="#ede1f0"/>
+      <text x="356" y="80.5" font-size="9.5" fill="#611f69" text-anchor="middle">via PageThreads</text>
+      <text x="410" y="80" font-size="10.5" fill="#8a8a90">9:20 AM</text>
+      <text x="286" y="106" font-size="12.5" font-weight="700" fill="#17171b">🔗 Discussion for: India lose No.1 T20I ranking</text>
+      <text x="286" y="124" font-size="11" fill="#3a3a42">Entity: <tspan font-family="ui-monospace, Menlo, monospace" fill="#772f7a">web:https://www.rediff.com/cricket/report/ind-t20i-no1</tspan> (resolver web@1)</text>
+      <text x="286" y="142" font-size="11" fill="#3a3a42">Link: <tspan fill="#1264a3">https://www.rediff.com/cricket/report/ind-t20i-no1</tspan></text>
+      <text x="286" y="160" font-size="11" fill="#6b6b73">Started by nat@realm.example</text>
+
+      <!-- Ada -->
+      <rect x="240" y="188" width="34" height="34" rx="7" fill="#4a8a3f"/>
+      <text x="257" y="210" fill="#fff" font-size="13" font-weight="700" text-anchor="middle">A</text>
+      <text x="286" y="204" font-size="13" font-weight="700" fill="#17171b">Ada Lovelace</text>
+      <text x="372" y="204" font-size="10.5" fill="#8a8a90">9:24 AM</text>
+      <text x="286" y="223" font-size="12.5" fill="#1d1c1d">Wait — does this account for the England series, or the live table?</text>
+
+      <!-- Nat -->
+      <rect x="240" y="248" width="34" height="34" rx="7" fill="#3f6db5"/>
+      <text x="257" y="270" fill="#fff" font-size="13" font-weight="700" text-anchor="middle">N</text>
+      <text x="286" y="264" font-size="13" font-weight="700" fill="#17171b">Nat</text>
+      <text x="316" y="264" font-size="10.5" fill="#8a8a90">9:26 AM</text>
+      <text x="286" y="283" font-size="12.5" fill="#1d1c1d">Just the live table — the ICC update posts tomorrow.</text>
+      <rect x="286" y="292" width="48" height="20" rx="10" fill="#e8f5fa" stroke="#1264a3"/>
+      <text x="297" y="306" font-size="12">👍</text>
+      <text x="322" y="306" fill="#0b5394" font-size="11.5" font-weight="700" text-anchor="middle">2</text>
+      <rect x="340" y="292" width="44" height="20" rx="10" fill="#f6f6f6" stroke="#e6e6e6"/>
+      <text x="351" y="306" font-size="12">🏏</text>
+      <text x="374" y="306" fill="#1d1c1d" font-size="11.5" font-weight="700" text-anchor="middle">1</text>
+
+      <!-- Ravi -->
+      <rect x="240" y="330" width="34" height="34" rx="7" fill="#b5643f"/>
+      <text x="257" y="352" fill="#fff" font-size="13" font-weight="700" text-anchor="middle">R</text>
+      <text x="286" y="346" font-size="13" font-weight="700" fill="#17171b">Ravi Kumar</text>
+      <text x="372" y="346" font-size="10.5" fill="#8a8a90">9:31 AM</text>
+      <rect x="286" y="354" width="44" height="18" rx="4" fill="#ede1f0"/>
+      <text x="293" y="367" font-size="12.5" font-weight="600" fill="#611f69">@Ada</text>
+      <text x="336" y="367" font-size="12.5" fill="#1d1c1d">thanks, that clears it up.</text>
+
+      <!-- compose box -->
+      <rect x="232" y="504" width="690" height="40" rx="8" fill="#ffffff" stroke="#d4d1da"/>
+      <text x="248" y="528" font-size="12.5" fill="#8b8b91">Message #web-threads</text>
+      <rect x="884" y="512" width="26" height="24" rx="6" fill="#f2eef3"/>
+      <path d="M891 528 l13 -4 l-13 -4 l0 3 l8 1 l-8 1 z" fill="#3f0e40"/>
+    </g>
+    <line x1="220" y1="10" x2="220" y2="550" stroke="#e0dde4"/>
+  </g>
+
+  <rect x="10" y="10" width="920" height="540" rx="12" fill="none" stroke="#deded7"/>
+</svg>
